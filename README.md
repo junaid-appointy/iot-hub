@@ -2,6 +2,8 @@
 
 Discover and control smart devices on your local network, regardless of brand or protocol.
 
+Comparing against your own dashboard? See **[FEATURES.md](FEATURES.md)**: a checklist of every feature, where it lives, and the gotchas behind it.
+
 ```bash
 git clone <this repo> iot-hub && cd iot-hub && npm install
 npm run ui                   # web dashboard at http://localhost:7070 (opens your browser)
