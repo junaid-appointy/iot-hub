@@ -1,0 +1,30 @@
+{
+  "name": "iot-hub",
+  "version": "0.1.0",
+  "description": "Discover and control IoT devices on the local network (WiZ, Hue, Kasa, Yeelight, LIFX, Tuya, Shelly, WLED, Nanoleaf)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "iot": "dist/cli/main.js"
+  },
+  "scripts": {
+    "iot": "tsx src/cli/main.ts",
+    "ui": "tsx src/cli/main.ts ui",
+    "build": "tsc && cp src/web/ui.html dist/web/ui.html",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "commonjs",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "multicast-dns": "^7.2.5"
+  },
+  "devDependencies": {
+    "@types/multicast-dns": "^7.2.4",
+    "@types/node": "^25.9.1",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  }
+}

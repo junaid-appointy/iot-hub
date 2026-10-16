@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>iot-hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='14' r='9' fill='%23f5b841'/%3E%3Crect x='12' y='24' width='8' height='5' rx='1.5' fill='%23888'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #f5f5f2;
+    --surface: #ffffff;
+    --surface-2: #f0efeb;
+    --border: #e3e1db;
+    --text: #1d1c1a;
+    --muted: #6d6a63;
+    --faint: #a19d94;
+    --accent: #c2410c;
+    --accent-soft: #fdebe1;
+    --ok: #15803d;
+    --warn: #b45309;
+    --warn-soft: #fef3c7;
+    --danger: #b91c1c;
+    --danger-soft: #fee2e2;
+    --shadow: 0 1px 2px rgba(20, 18, 14, .06), 0 2px 8px rgba(20, 18, 14, .04);
+    --radius: 14px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413;
+      --surface: #1d1d1b;
+      --surface-2: #262624;
+      --border: #33322f;
+      --text: #ecebe6;
+      --muted: #a3a097;
+      --faint: #6f6c65;
+      --accent: #f0864d;
+      --accent-soft: #3a2418;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --warn-soft: #3a2f12;
+      --danger: #f87171;
+      --danger-soft: #3b1a1a;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141413; --surface: #1d1d1b; --surface-2: #262624; --border: #33322f; --text: #ecebe6; --muted: #a3a097;
+    --faint: #6f6c65; --accent: #f0864d; --accent-soft: #3a2418; --ok: #4ade80; --warn: #fbbf24; --warn-soft: #3a2f12;
+    --danger: #f87171; --danger-soft: #3b1a1a; --shadow: 0 1px 2px rgba(0, 0, 0, .3); color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px 64px; }
+
+  /* Header */
+  header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 14px 0; flex-wrap: wrap; }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
+  .brand .summary { color: var(--muted); font-size: 13px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--surface); cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 550; }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+  .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
+  .btn.small { height: 28px; padding: 0 10px; font-size: 13px; }
+  .btn.danger { color: var(--danger); }
+  .search { height: 34px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); padding: 0 12px; width: 220px; max-width: 100%; }
+  .search:focus, .field:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 18px 0 14px; flex-wrap: wrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-right: auto; }
+  .chip { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--muted); }
+  .chip[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
+  .chip .n { opacity: .65; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+  /* Grid + cards */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; transition: border-color .2s; }
+  .card.is-on { border-color: color-mix(in srgb, var(--glow, #f5b841) 45%, var(--border)); }
+  .card.offline { opacity: .7; }
+  .card.pending { border-color: var(--warn); border-style: dashed; }
+  .head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .orb { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; position: relative; background: var(--surface-2); transition: background .3s, box-shadow .3s; }
+  .orb::after { content: ""; position: absolute; inset: 11px; border-radius: 50%; background: var(--faint); opacity: .5; transition: background .3s, opacity .3s; }
+  .card.is-on .orb { background: color-mix(in srgb, var(--glow) 22%, var(--surface)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow) 40%, transparent), 0 0 calc(6px + var(--lvl, 1) * 18px) color-mix(in srgb, var(--glow) 55%, transparent); }
+  .card.is-on .orb::after { background: var(--glow); opacity: calc(.45 + var(--lvl, 1) * .55); }
+  .title { min-width: 0; flex: 1; }
+  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; border-radius: 4px; }
+  .name:hover { background: var(--surface-2); }
+  .name input { width: 100%; border: 1px solid var(--accent); border-radius: 6px; padding: 1px 6px; background: var(--surface); font-weight: 600; }
+  .meta { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status-line { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 18px; }
+
+  /* Switch */
+  .switch { flex: none; position: relative; width: 42px; height: 24px; border-radius: 999px; border: 0; background: var(--border); cursor: pointer; transition: background .2s; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s; }
+  .switch[aria-checked="true"] { background: var(--ok); }
+  .switch[aria-checked="true"]::after { transform: translateX(18px); }
+  .switch:disabled { opacity: .5; cursor: default; }
+
+  /* Controls */
+  .control { display: grid; grid-template-columns: 74px 1fr 46px; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .control output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; background: var(--track, var(--surface-2)); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 1px solid rgba(0,0,0,.2); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 1px solid rgba(0,0,0,.2); }
+  input[type=range].bright { --track: linear-gradient(90deg, #44403c, #fde68a); }
+  input[type=range].temp { --track: linear-gradient(90deg, #ff9329, #ffd6aa, #fff4ea, #c9e2ff); }
+  .swatches { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .sw { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
+  .sw:hover { transform: scale(1.12); }
+  input[type=color] { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 50%; padding: 0; background: none; cursor: pointer; }
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 2px; }
+  input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+  select.field, input.field { height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); padding: 0 8px; min-width: 0; width: 100%; }
+  .foot { display: flex; gap: 4px; justify-content: flex-end; margin-top: auto; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 550; }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.danger { background: var(--danger-soft); color: var(--danger); }
+  .reason { font-size: 13px; color: var(--muted); }
+
+  /* Sections */
+  details.section { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  details.section summary { padding: 12px 16px; cursor: pointer; font-weight: 600; list-style: none; display: flex; gap: 8px; align-items: center; }
+  details.section summary::before { content: "▸"; color: var(--faint); transition: transform .15s; }
+  details.section[open] summary::before { transform: rotate(90deg); }
+  details.section summary .sub { font-weight: 400; color: var(--muted); }
+  .table-wrap { overflow-x: auto; padding: 0 16px 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { text-align: left; padding: 7px 10px 7px 0; border-top: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; border-top: 0; }
+  td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 80px 16px; color: var(--muted); }
+  .empty h2 { color: var(--text); margin: 0 0 6px; font-size: 20px; }
+  .empty p { margin: 0 0 20px; }
+
+  /* Modal */
+  .backdrop { position: fixed; inset: 0; background: rgba(10, 10, 9, .45); display: flex; align-items: flex-start; justify-content: center; padding: 8vh 16px 16px; z-index: 20; overflow-y: auto; }
+  .modal { width: 100%; max-width: 520px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .modal header { position: static; background: none; backdrop-filter: none; display: flex; align-items: center; gap: 8px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .modal header h3 { margin: 0; font-size: 16px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal .body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px 16px; }
+  .msg { padding: 9px 12px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px; white-space: pre-wrap; }
+  .msg.warn { background: var(--warn-soft); color: var(--warn); }
+  .msg.success { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); }
+  .msg.error { background: var(--danger-soft); color: var(--danger); }
+  .steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 8px; }
+  .steps-title { font-weight: 600; margin-bottom: -2px; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 24px 1fr; gap: 8px; font-size: 13.5px; }
+  .steps li::before { content: counter(s); width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 650; display: grid; place-items: center; }
+  .steps a { color: var(--accent); }
+  .prompt { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--accent); border-radius: 12px; }
+  .prompt label { font-weight: 550; }
+  .prompt .row { display: flex; gap: 8px; }
+  .prompt .row input { flex: 1; height: 34px; }
+  .option { text-align: left; display: block; width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  .option:hover { border-color: var(--accent); }
+  .option small { display: block; color: var(--muted); }
+  .waiting { display: flex; gap: 10px; align-items: center; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-all; }
+
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toasts */
+  .banner { position: sticky; top: 63px; z-index: 4; margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-weight: 550; }
+  .moods { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .moods-label { color: var(--muted); font-size: 13px; margin-right: 4px; }
+  .moods-status { color: var(--muted); font-size: 12.5px; margin-left: auto; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); display: inline-block; }
+  .dot.club { background: conic-gradient(#ff3b30, #ffd60a, #34c759, #0a84ff, #bf5af2, #ff3b30); }
+  #clubBtn.running { background: var(--text); color: var(--bg); border-color: var(--text); }
+  #clubBtn.running .dot.club { animation: spin 1.2s linear infinite; }
+  .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 30; max-width: min(380px, calc(100vw - 32px)); }
+  .toast { background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 13.5px; animation: up .2s ease-out; }
+  .toast.error { background: var(--danger); color: #fff; }
+  .toast small { display: block; opacity: .85; margin-top: 2px; }
+  @keyframes up { from { transform: translateY(8px); opacity: 0; } }
+
+  @media (max-width: 640px) {
+    .search { width: 100%; order: 5; }
+    .brand { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: .01s !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap bar">
+    <div class="brand"><h1>iot-hub</h1><span class="summary" id="summary"></span></div>
+    <input class="search" id="search" type="search" placeholder="Filter by name, brand, IP…" aria-label="Filter devices" />
+    <button class="btn" id="addBtn" title="Add a device by IP address">Add by IP</button>
+    <button class="btn primary" id="scanBtn">Scan network</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="offlineBanner" hidden>Lost connection to the iot-hub server. Is <code>npm run ui</code> still running in your terminal? Retrying…</div>
+  <div class="toolbar" id="toolbar" hidden>
+    <div class="chips" id="chips"></div>
+    <button class="btn small" id="allOn">Turn on shown</button>
+    <button class="btn small" id="allOff">Turn off shown</button>
+  </div>
+  <div class="moods" id="moods" hidden>
+    <span class="moods-label">Lighting for shown lights</span>
+    <button class="btn small mood" id="clubBtn"><span class="dot club"></span>Club mode</button>
+    <button class="btn small mood" data-kelvin="6500"><span class="dot" style="background:#e8f1ff"></span>All white</button>
+    <button class="btn small mood" data-kelvin="2700"><span class="dot" style="background:#ffb46b"></span>All warm white</button>
+    <span class="moods-status" id="clubStatus"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>
+    <h2>No devices yet</h2>
+    <p>Scan your network to find lights, plugs and switches.</p>
+    <button class="btn primary" data-action="scan">Scan network</button>
+  </div>
+  <details class="section" id="unknownSection" hidden>
+    <summary>Other devices on your network <span class="sub" id="unknownCount"></span></summary>
+    <div class="table-wrap"><table id="unknownTable"></table></div>
+  </details>
+  <details class="section" id="guideSection">
+    <summary>Troubleshooting <span class="sub">— a device isn't showing up or won't respond</span></summary>
+    <div class="table-wrap" id="guide"></div>
+  </details>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+  const BRANDS = { wiz: 'WiZ', hue: 'Hue', kasa: 'Kasa', yeelight: 'Yeelight', lifx: 'LIFX', tuya: 'Tuya', shelly: 'Shelly', wled: 'WLED', nanoleaf: 'Nanoleaf' };
+  const SWATCHES = ['#ff3b30', '#ff9500', '#ffd60a', '#34c759', '#00c7be', '#0a84ff', '#5e5ce6', '#bf5af2', '#ff2d92'];
+  const S = { devices: [], states: {}, unknown: [], filter: 'all', q: '', busyUntil: {}, scanning: false };
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+  // ---------- API ----------
+  async function api(path, opts = {}) {
+    const res = await fetch('/api' + path, {
+      method: opts.method || (opts.body ? 'POST' : 'GET'),
+      headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { hint: data.hint });
+    return data;
+  }
+
+  // ---------- helpers ----------
+  function kelvinToRgb(k) {
+    const t = k / 100;
+    let r, g, b;
+    r = t <= 66 ? 255 : 329.7 * Math.pow(t - 60, -0.1332);
+    g = t <= 66 ? 99.47 * Math.log(t) - 161.12 : 288.12 * Math.pow(t - 60, -0.0755);
+    b = t >= 66 ? 255 : t <= 19 ? 0 : 138.52 * Math.log(t - 10) - 305.04;
+    const c = (v) => Math.round(Math.min(255, Math.max(0, v)));
+    return `rgb(${c(r)}, ${c(g)}, ${c(b)})`;
+  }
+  const rgbHex = ({ r, g, b }) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  const has = (d, cap) => d.capabilities.includes(cap);
+  const glowOf = (s) => (s?.color ? rgbHex(s.color) : s?.colorTemp ? kelvinToRgb(s.colorTemp) : '#f5b841');
+  const isBusy = (id) => (S.busyUntil[id] || 0) > Date.now();
+
+  function toast(message, hint, error = false) {
+    const el = document.createElement('div');
+    el.className = 'toast' + (error ? ' error' : '');
+    el.innerHTML = esc(message) + (hint ? `<small>${esc(hint)}</small>` : '');
+    $('#toasts').append(el);
+    setTimeout(() => el.remove(), error ? 7000 : 2500);
+  }
+
+  function throttle(fn, ms) {
+    let last = 0, timer;
+    return (...args) => {
+      clearTimeout(timer);
+      const wait = ms - (Date.now() - last);
+      if (wait <= 0) { last = Date.now(); fn(...args); }
+      else timer = setTimeout(() => { last = Date.now(); fn(...args); }, wait);
+    };
+  }
+
+  // ---------- filtering ----------
+  function visible() {
+    const q = S.q.trim().toLowerCase();
+    return S.devices.filter((d) => {
+      const s = S.states[d.id];
+      if (S.filter === 'on' && !(s?.online && s.on)) return false;
+      if (S.filter === 'off' && !(s?.online && !s.on)) return false;
+      if (S.filter === 'setup' && d.status === 'ready') return false;
+      if (S.filter === 'offline' && !(d.status === 'ready' && s && !s.online)) return false;
+      if (!q) return true;
+      return [d.name, d.address, d.model, BRANDS[d.driver], d.driver, d.kind].some((v) => String(v || '').toLowerCase().includes(q));
+    });
+  }
+
+  function renderChrome() {
+    const ready = S.devices.filter((d) => d.status === 'ready');
+    const on = ready.filter((d) => S.states[d.id]?.on && S.states[d.id]?.online).length;
+    const offline = ready.filter((d) => S.states[d.id] && !S.states[d.id].online).length;
+    const setup = S.devices.length - ready.length;
+    $('#summary').textContent = S.devices.length ? `${S.devices.length} devices · ${on} on${offline ? ` · ${offline} offline` : ''}` : '';
+    $('#toolbar').hidden = !S.devices.length;
+    $('#moods').hidden = !S.devices.some((d) => d.status === 'ready' && d.kind === 'light');
+    $('#empty').hidden = !!S.devices.length || S.scanning;
+    const chips = [['all', 'All', S.devices.length], ['on', 'On', on], ['off', 'Off', ready.length - on - offline]];
+    if (offline) chips.push(['offline', 'Offline', offline]);
+    if (setup) chips.push(['setup', 'Needs setup', setup]);
+    $('#chips').innerHTML = chips.map(([k, label, n]) => `<button class="chip" data-filter="${k}" aria-pressed="${S.filter === k}">${label}<span class="n">${n}</span></button>`).join('');
+  }
+
+  // ---------- cards ----------
+  function cardHtml(d) {
+    const meta = `${BRANDS[d.driver] || d.driver} · ${esc(d.address)}${d.model ? ' · ' + esc(d.model) : ''}`;
+    if (d.status !== 'ready') {
+      const pill = d.status === 'needs_setup' ? '<span class="pill warn">Needs setup</span>' : '<span class="pill danger">Unsupported</span>';
+      return `
+        <div class="head">
+          <div class="orb" aria-hidden="true"></div>
+          <div class="title"><div class="name" data-action="rename" title="Click to rename">${esc(d.name)}</div><div class="meta" title="${meta}">${meta}</div></div>
+        </div>
+        <div>${pill}</div>
+        ${d.statusReason ? `<div class="reason">${esc(d.statusReason)}</div>` : ''}
+        <div class="foot">
+          <button class="btn small ghost" data-action="details">Details</button>
+          ${d.status === 'needs_setup' ? '<button class="btn small primary" data-action="setup">Set up</button>' : ''}
+        </div>`;
+    }
+    const range = d.colorTempRange || [2700, 6500];
+    return `
+      <div class="head">
+        <button class="orb" data-action="toggle" aria-label="Toggle ${esc(d.name)}"></button>
+        <div class="title"><div class="name" data-action="rename" title="Click to rename">${esc(d.name)}</div><div class="meta" title="${meta}">${meta}</div></div>
+        <button class="switch" role="switch" aria-checked="false" data-action="power" aria-label="Power"></button>
+      </div>
+      <div class="status-line" data-ref="status">Reading…</div>
+      ${has(d, 'brightness') ? `<label class="control">Brightness<input type="range" class="bright" min="1" max="100" step="1" data-ref="bright" /><output data-ref="brightOut">–</output></label>` : ''}
+      ${has(d, 'color_temp') ? `<label class="control">White<input type="range" class="temp" min="${range[0]}" max="${range[1]}" step="50" data-ref="temp" /><output data-ref="tempOut">–</output></label>` : ''}
+      ${has(d, 'color') ? `<div class="control"><span>Color</span><div class="swatches">${SWATCHES.map((c) => `<button class="sw" style="background:${c}" data-color="${c}" aria-label="Set color ${c}"></button>`).join('')}<input type="color" data-ref="picker" aria-label="Custom color" value="#ffffff" /></div><span></span></div>` : ''}
+      ${has(d, 'scene') && d.scenes?.length ? `<label class="control">Scene<select class="field" data-ref="scene"><option value="">Choose…</option>${d.scenes.map((s) => `<option>${esc(s)}</option>`).join('')}</select><span></span></label>` : ''}
+      <div class="foot"><button class="btn small ghost" data-action="details">Details</button></div>`;
+  }
+
+  function renderGrid() {
+    const grid = $('#grid');
+    const list = visible();
+    const existing = new Map([...grid.children].map((el) => [el.dataset.id, el]));
+    const frag = document.createDocumentFragment();
+    for (const d of list) {
+      let el = existing.get(d.id);
+      const sig = JSON.stringify([d.name, d.status, d.address, d.capabilities, d.scenes?.length, d.statusReason, d.colorTempRange]);
+      if (!el || el.dataset.sig !== sig) {
+        el = document.createElement('article');
+        el.className = 'card';
+        el.dataset.id = d.id;
+        el.dataset.sig = sig;
+        el.innerHTML = cardHtml(d);
+        wireCard(el, d);
+      }
+      frag.append(el);
+      updateCard(el, d);
+    }
+    grid.replaceChildren(frag);
+    if (S.devices.length && !list.length) grid.innerHTML = `<div class="empty" style="grid-column:1/-1;padding:40px">No devices match this filter.</div>`;
+    renderChrome();
+  }
+
+  function updateCard(el, d) {
+    if (d.status !== 'ready') { el.className = 'card pending'; return; }
+    const s = S.states[d.id];
+    const on = !!(s?.online && s.on);
+    el.className = 'card' + (on ? ' is-on' : '') + (s && !s.online ? ' offline' : '');
+    el.style.setProperty('--glow', glowOf(s));
+    el.style.setProperty('--lvl', s?.brightness != null ? Math.max(0.15, s.brightness / 100) : 1);
+    const sw = $('[data-action=power]', el);
+    sw.setAttribute('aria-checked', on);
+    sw.disabled = !!s && !s.online;
+    el.querySelectorAll('input, select, .sw').forEach((x) => (x.disabled = !!s && !s.online));
+    const status = $('[data-ref=status]', el);
+    if (!s) status.textContent = 'Reading…';
+    else if (!s.online) status.innerHTML = '<span class="pill danger">Offline</span> <span>not responding</span>';
+    else {
+      status.textContent = [on ? 'On' : 'Off', on && s.scene, on && s.color && rgbHex(s.color).toUpperCase(), on && !s.color && s.colorTemp && `${s.colorTemp}K`].filter(Boolean).join(' · ');
+      const rssi = s.extra?.rssi;
+      // Below about -78 dBm WiZ bulbs start dropping packets, so they connect and disconnect.
+      if (typeof rssi === 'number' && rssi <= -78) {
+        status.insertAdjacentHTML('beforeend', ` <span class="pill warn" title="Signal ${rssi} dBm. Packets get lost, so this bulb may respond slowly or drop offline. Move the router/extender closer or check the fixture isn't metal.">Weak Wi-Fi ${rssi} dBm</span>`);
+      }
+    }
+
+    // Don't fight the user while they're dragging or a command is in flight.
+    if (isBusy(d.id)) return;
+    const bright = $('[data-ref=bright]', el);
+    if (bright && s?.brightness != null && document.activeElement !== bright) { bright.value = s.brightness; $('[data-ref=brightOut]', el).textContent = s.brightness + '%'; }
+    const temp = $('[data-ref=temp]', el);
+    if (temp && s?.colorTemp && document.activeElement !== temp) { temp.value = s.colorTemp; $('[data-ref=tempOut]', el).textContent = s.colorTemp + 'K'; }
+    const scene = $('[data-ref=scene]', el);
+    if (scene && document.activeElement !== scene) scene.value = s?.scene && d.scenes?.includes(s.scene) ? s.scene : '';
+    const picker = $('[data-ref=picker]', el);
+    if (picker && s?.color) picker.value = rgbHex(s.color);
+  }
+
+  /** Returns true on success. With `silent`, errors are left to the caller to report. */
+  async function send(d, command, silent = false) {
+    S.busyUntil[d.id] = Date.now() + 2500;
+    let ok = true;
+    try {
+      const { state } = await api(`/devices/${encodeURIComponent(d.id)}/command`, { body: command });
+      S.states[d.id] = state;
+    } catch (e) {
+      ok = false;
+      if (!silent) toast(e.message, e.hint, true);
+      S.busyUntil[d.id] = 0;
+      if (/isn't responding/.test(e.message)) S.states[d.id] = { ...S.states[d.id], online: false };
+      else refreshStates([d.id]);
+    }
+    const el = $(`.card[data-id="${CSS.escape(d.id)}"]`);
+    if (el) { S.busyUntil[d.id] = Math.min(S.busyUntil[d.id], Date.now() + 600); updateCard(el, d); }
+    renderChrome();
+    return ok;
+  }
+
+  function wireCard(el, d) {
+    el.addEventListener('click', (ev) => {
+      const t = ev.target.closest('[data-action],[data-color]');
+      if (!t) return;
+      const a = t.dataset.action;
+      if (t.dataset.color) return optimistic(d, { color: hexToRgb(t.dataset.color), colorTemp: undefined, scene: undefined, on: true }, { type: 'color', color: t.dataset.color });
+      if (a === 'power') return optimistic(d, { on: !(S.states[d.id]?.on) }, { type: 'power', on: !(S.states[d.id]?.on) });
+      if (a === 'toggle') return optimistic(d, { on: !(S.states[d.id]?.on) }, { type: 'toggle' });
+      if (a === 'details') return showDetails(d);
+      if (a === 'setup') return runSetup(d);
+      if (a === 'rename') return startRename(el, d);
+    });
+    const bright = $('[data-ref=bright]', el);
+    if (bright) {
+      const push = throttle((v) => send(d, { type: 'brightness', value: v }), 350);
+      bright.addEventListener('input', () => {
+        S.busyUntil[d.id] = Date.now() + 2500;
+        $('[data-ref=brightOut]', el).textContent = bright.value + '%';
+        push(Number(bright.value));
+      });
+    }
+    const temp = $('[data-ref=temp]', el);
+    if (temp) {
+      const push = throttle((v) => send(d, { type: 'color_temp', kelvin: v }), 350);
+      temp.addEventListener('input', () => {
+        S.busyUntil[d.id] = Date.now() + 2500;
+        $('[data-ref=tempOut]', el).textContent = temp.value + 'K';
+        el.style.setProperty('--glow', kelvinToRgb(Number(temp.value)));
+        push(Number(temp.value));
+      });
+    }
+    const picker = $('[data-ref=picker]', el);
+    if (picker) picker.addEventListener('change', () => optimistic(d, { color: hexToRgb(picker.value), on: true, colorTemp: undefined }, { type: 'color', color: picker.value }));
+    const scene = $('[data-ref=scene]', el);
+    if (scene) scene.addEventListener('change', () => scene.value && optimistic(d, { scene: scene.value, on: true }, { type: 'scene', scene: scene.value }));
+  }
+
+  function hexToRgb(h) { return { r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16) }; }
+
+  function optimistic(d, patch, command, silent = false) {
+    S.states[d.id] = { online: true, ...S.states[d.id], ...patch };
+    const el = $(`.card[data-id="${CSS.escape(d.id)}"]`);
+    if (el) updateCard(el, d);
+    renderChrome();
+    return send(d, command, silent);
+  }
+
+  function startRename(el, d) {
+    const name = $('.name', el);
+    if (name.querySelector('input')) return;
+    const input = document.createElement('input');
+    input.value = d.name;
+    name.replaceChildren(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = async (save) => {
+      if (done) return;
+      done = true;
+      const v = input.value.trim();
+      if (save && v && v !== d.name) {
+        try {
+          await api(`/devices/${encodeURIComponent(d.id)}/rename`, { body: { name: v } });
+          d.name = v;
+          S.devices.sort((a, b) => a.name.localeCompare(b.name));
+        } catch (e) { toast(e.message, e.hint, true); }
+      }
+      renderGrid();
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  // ---------- data loading ----------
+  async function loadDevices() {
+    const { devices } = await api('/devices');
+    S.devices = devices;
+    renderGrid();
+  }
+
+  let refreshing = false;
+  async function refreshStates(ids) {
+    if (refreshing && !ids) return;
+    if (!ids) refreshing = true;
+    try {
+      const q = ids ? '?ids=' + ids.map(encodeURIComponent).join(',') : '';
+      const { states } = await api('/states' + q);
+      for (const [id, s] of Object.entries(states)) if (!isBusy(id)) S.states[id] = s;
+      for (const el of $('#grid').children) {
+        const d = S.devices.find((x) => x.id === el.dataset.id);
+        if (d) updateCard(el, d);
+      }
+      renderChrome();
+      $('#offlineBanner').hidden = true;
+    } catch (e) {
+      if (e instanceof TypeError) $('#offlineBanner').hidden = false; // fetch failed: server is down
+    } finally { if (!ids) refreshing = false; }
+  }
+
+  async function scan() {
+    if (S.scanning) return;
+    S.scanning = true;
+    const btn = $('#scanBtn');
+    btn.disabled = true;
+    let left = 10;
+    btn.innerHTML = `<span class="spinner"></span> Scanning…`;
+    const tick = setInterval(() => { left = Math.max(0, left - 1); btn.innerHTML = `<span class="spinner"></span> Scanning… ${left ? left + 's' : ''}`; }, 1000);
+    renderChrome();
+    try {
+      const r = await api('/scan', { body: { timeout: 10 } });
+      S.devices = r.devices;
+      Object.assign(S.states, r.states);
+      S.unknown = r.unknown;
+      renderGrid();
+      renderUnknown();
+      const pending = r.devices.filter((d) => d.status === 'needs_setup').length;
+      toast(`Found ${r.devices.length} device${r.devices.length === 1 ? '' : 's'}${r.added.length ? ` (${r.added.length} new)` : ''}${pending ? ` · ${pending} need setup` : ''}`);
+      r.errors.forEach((e) => toast(`${e.driver}: ${e.error || e.message}`, null, true));
+      refreshStates();
+    } catch (e) {
+      toast(e.message, e.hint, true);
+    } finally {
+      clearInterval(tick);
+      S.scanning = false;
+      btn.disabled = false;
+      btn.textContent = 'Scan network';
+      renderChrome();
+    }
+  }
+
+  function renderUnknown() {
+    $('#unknownSection').hidden = !S.unknown.length;
+    $('#unknownCount').textContent = `— ${S.unknown.length} found, no driver yet`;
+    $('#unknownTable').innerHTML = '<tr><th>Address</th><th>Name</th><th>What it looks like</th></tr>' +
+      S.unknown.map((h) => `<tr><td class="mono">${esc(h.address)}</td><td>${esc(h.name || '—')}</td><td>${esc(h.hints.join(', ') || h.services.slice(0, 3).join(', '))}</td></tr>`).join('');
+  }
+
+  async function loadGuide() {
+    try {
+      const { drivers } = await api('/drivers');
+      $('#guide').innerHTML = '<table><tr><th>Brand</th><th>Tips</th></tr>' + drivers.map((d) =>
+        `<tr><td><strong>${esc(d.name)}</strong></td><td>${d.troubleshooting.map((t) => `<div>• ${esc(t)}</div>`).join('')}</td></tr>`).join('') +
+        '<tr><td><strong>General</strong></td><td><div>• Your laptop and the devices must be on the same network: guest Wi-Fi and "AP isolation" block discovery.</div><div>• Disconnect VPNs while scanning.</div><div>• Still missing? Use <em>Add by IP</em>.</div></td></tr></table>';
+    } catch {}
+  }
+
+  // ---------- modals ----------
+  function modal(title, { onClose } = {}) {
+    const back = document.createElement('div');
+    back.className = 'backdrop';
+    back.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><h3>${esc(title)}</h3><button class="btn ghost small" data-close aria-label="Close">✕</button></header><div class="body"></div><div class="actions"></div></div>`;
+    const close = () => { back.remove(); document.removeEventListener('keydown', onKey); onClose?.(); };
+    const onKey = (e) => e.key === 'Escape' && close();
+    document.addEventListener('keydown', onKey);
+    back.addEventListener('click', (e) => { if (e.target === back || e.target.closest('[data-close]')) close(); });
+    document.body.append(back);
+    return { el: back, body: $('.body', back), actions: $('.actions', back), close };
+  }
+
+  function showDetails(d) {
+    const s = S.states[d.id];
+    const m = modal(d.name);
+    const rows = [
+      ['Brand', BRANDS[d.driver] || d.driver], ['Type', d.kind], ['Model', d.model], ['IP address', d.address], ['MAC', d.mac],
+      ['Can do', d.capabilities.join(', ') || '—'], ['White range', d.colorTempRange && `${d.colorTempRange[0]}–${d.colorTempRange[1]}K`],
+      ['Status', d.status + (d.statusReason ? ` — ${d.statusReason}` : '')], ['Last seen', d.lastSeen && new Date(d.lastSeen).toLocaleString()],
+      ['Wi-Fi signal', typeof s?.extra?.rssi === 'number' && `${s.extra.rssi} dBm (${s.extra.rssi > -67 ? 'good' : s.extra.rssi > -78 ? 'fair' : 'weak: expect drop-outs'})`],
+      ['Live state', s ? JSON.stringify(s) : '—'], ['ID', d.id],
+    ].filter(([, v]) => v);
+    m.body.innerHTML = `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd class="${k === 'ID' || k === 'Live state' || k === 'MAC' ? 'mono' : ''}">${esc(v)}</dd>`).join('')}</dl>`;
+    m.actions.innerHTML = `<button class="btn danger" data-act="remove">Remove</button>${d.status !== 'ready' || d.driver === 'tuya' || d.driver === 'hue' || d.driver === 'nanoleaf' || d.driver === 'shelly' ? '<button class="btn" data-act="setup">Run setup again</button>' : ''}<button class="btn" data-close>Close</button>`;
+    m.actions.addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (act === 'remove') {
+        if (!confirm(`Remove ${d.name}? It will come back on the next scan if it's still on the network.`)) return;
+        await api(`/devices/${encodeURIComponent(d.id)}`, { method: 'DELETE' }).catch((err) => toast(err.message, err.hint, true));
+        m.close();
+        loadDevices();
+      }
+      if (act === 'setup') { m.close(); runSetup(d); }
+    });
+  }
+
+  function addByIp() {
+    const m = modal('Add a device by IP');
+    m.body.innerHTML = `
+      <div class="reason">Use this when a device doesn't show up in a scan, for example when your router blocks broadcasts. Find the IP in the brand's app or in your router's client list.</div>
+      <form class="prompt" id="addForm"><label for="ip">IP address</label><div class="row"><input class="field" id="ip" placeholder="192.168.1.40" autocomplete="off" required /><button class="btn primary">Add</button></div></form>
+      <div id="addResult"></div>`;
+    const ip = $('#ip', m.body);
+    ip.focus();
+    $('#addForm', m.body).addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const out = $('#addResult', m.body);
+      out.innerHTML = `<div class="waiting"><span class="spinner"></span> Probing ${esc(ip.value)}…</div>`;
+      try {
+        const r = await api('/add', { body: { ip: ip.value.trim() } });
+        if (r.devices.length) {
+          out.innerHTML = `<div class="msg success">Added: ${r.devices.map((d) => esc(d.name)).join(', ')}</div>`;
+          await loadDevices();
+          refreshStates();
+          const pending = r.devices.find((d) => d.status === 'needs_setup');
+          if (pending) { m.close(); runSetup(pending); }
+        } else {
+          out.innerHTML = `<div class="msg warn">Couldn't identify a supported device at ${esc(ip.value)}.${r.hints.length ? '\n\n' + r.hints.map(esc).join('\n') : '\nNo known ports are open. Check the IP and that the device is on the same network.'}</div>`;
+        }
+      } catch (err) {
+        out.innerHTML = `<div class="msg error">${esc(err.message)}${err.hint ? '\n' + esc(err.hint) : ''}</div>`;
+      }
+    });
+  }
+
+  /** Guided setup: render driver events, answer prompts. */
+  async function runSetup(d) {
+    let session, source, finished = false;
+    const m = modal(`Set up ${d.name}`, {
+      onClose: () => { source?.close(); if (!finished && session) api(`/setup/${session}/cancel`, { method: 'POST' }).catch(() => {}); },
+    });
+    const log = document.createElement('div');
+    log.style.cssText = 'display:flex;flex-direction:column;gap:12px';
+    const slot = document.createElement('div');
+    m.body.append(log, slot);
+    m.actions.innerHTML = '<button class="btn" data-close>Cancel</button>';
+    const answer = (value) => { slot.innerHTML = ''; return api(`/setup/${session}/answer`, { body: { value } }); };
+    const linkify = (s) => esc(s).replace(/(https?:\/\/[^\s)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    const scroll = () => (m.body.scrollTop = m.body.scrollHeight);
+
+    try {
+      session = (await api(`/devices/${encodeURIComponent(d.id)}/setup`, { method: 'POST' })).session;
+    } catch (e) {
+      log.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+      return;
+    }
+    source = new EventSource(`/api/setup/${session}/events`);
+    source.onmessage = (ev) => {
+      const e = JSON.parse(ev.data);
+      switch (e.kind) {
+        case 'info': case 'warn': case 'success':
+          log.insertAdjacentHTML('beforeend', `<div class="msg ${e.kind}">${linkify(e.message)}</div>`); break;
+        case 'steps':
+          log.insertAdjacentHTML('beforeend', `<div><div class="steps-title">${esc(e.title)}</div><ol class="steps" style="margin-top:10px">${e.steps.map((s) => `<li><span>${linkify(s)}</span></li>`).join('')}</ol></div>`); break;
+        case 'wait':
+          slot.innerHTML = `<div class="waiting"><span class="spinner"></span>${esc(e.message)}</div>`; break;
+        case 'wait-done':
+          slot.innerHTML = ''; break;
+        case 'ask': {
+          slot.innerHTML = `<form class="prompt"><label>${esc(e.question)}</label><div class="row"><input class="field" type="${e.secret ? 'password' : 'text'}" value="${esc(e.default || '')}" autocomplete="off" /><button class="btn primary">Continue</button></div></form>`;
+          const input = $('input', slot);
+          input.focus();
+          $('form', slot).addEventListener('submit', (ev) => { ev.preventDefault(); answer(input.value); });
+          break;
+        }
+        case 'confirm':
+          slot.innerHTML = `<div class="prompt"><label>${esc(e.question)}</label><div class="row" style="justify-content:flex-end"><button class="btn" data-v="0">Not now</button><button class="btn primary" data-v="1">Yes, start</button></div></div>`;
+          slot.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => answer(b.dataset.v === '1')));
+          $('.btn.primary', slot).focus();
+          break;
+        case 'choose':
+          slot.innerHTML = `<div class="prompt"><label>${esc(e.question)}</label>${e.options.map((o, i) => `<button class="option" data-i="${i}">${esc(o.label)}${o.hint ? `<small>${esc(o.hint)}</small>` : ''}</button>`).join('')}</div>`;
+          slot.querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => answer(Number(b.dataset.i))));
+          break;
+        case 'done': {
+          finished = true;
+          source.close();
+          slot.innerHTML = '';
+          const ready = e.devices.filter((x) => x.status === 'ready');
+          if (ready.length) log.insertAdjacentHTML('beforeend', `<div class="msg success">Ready: ${ready.map((x) => esc(x.name)).join(', ')}</div>`);
+          else log.insertAdjacentHTML('beforeend', `<div class="msg warn">Setup didn't finish. You can try again any time.</div>`);
+          m.actions.innerHTML = '<button class="btn primary" data-close>Done</button>';
+          loadDevices().then(() => refreshStates());
+          break;
+        }
+        case 'error': case 'cancelled':
+          finished = true;
+          source.close();
+          slot.innerHTML = '';
+          if (e.kind === 'error') log.insertAdjacentHTML('beforeend', `<div class="msg error">${esc(e.error)}${e.hint ? '\n' + esc(e.hint) : ''}</div>`);
+          m.actions.innerHTML = '<button class="btn" data-close>Close</button>';
+          break;
+      }
+      scroll();
+    };
+  }
+
+  // ---------- global wiring ----------
+  $('#scanBtn').addEventListener('click', scan);
+  $('#addBtn').addEventListener('click', addByIp);
+  $('#empty').addEventListener('click', (e) => e.target.closest('[data-action=scan]') && scan());
+  $('#search').addEventListener('input', (e) => { S.q = e.target.value; renderGrid(); });
+  $('#chips').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-filter]');
+    if (c) { S.filter = c.dataset.filter; renderGrid(); }
+  });
+  /** Send one command to every shown device that's online; one summary toast. */
+  async function group(command, label, { confirmOver = 3, filter = () => true } = {}) {
+    const shown = visible().filter((d) => d.status === 'ready' && filter(d));
+    const targets = shown.filter((d) => S.states[d.id]?.online !== false); // skip known-offline
+    const skipped = shown.length - targets.length;
+    if (!targets.length) return toast(shown.length ? 'All shown devices are offline' : 'No matching devices shown');
+    if (targets.length > confirmOver && !confirm(`${label}: ${targets.length} devices?`)) return;
+    targets.forEach((d) => (S.busyUntil[d.id] = Date.now() + 4000));
+    try {
+      const r = await api('/group', { body: { ids: targets.map((d) => d.id), command } });
+      setClub({ running: false });
+      const parts = [`${label}: ${r.ok} device${r.ok === 1 ? '' : 's'}`];
+      if (skipped) parts.push(`${skipped} offline skipped`);
+      if (r.failed.length) {
+        const names = r.failed.slice(0, 4).map((f) => f.name).join(', ') + (r.failed.length > 4 ? ` +${r.failed.length - 4} more` : '');
+        toast(parts.join(' · ') + ` · ${r.failed.length} didn't respond`, names, true);
+      } else toast(parts.join(' · '));
+    } catch (e) {
+      toast(e.message, e.hint, true);
+    }
+    targets.forEach((d) => (S.busyUntil[d.id] = 0));
+    refreshStates(targets.map((d) => d.id));
+  }
+  const bulk = (on) => group({ type: 'power', on }, on ? 'Turned on' : 'Turned off', { filter: (d) => d.capabilities.includes('power') });
+
+  // ---------- club mode ----------
+  let club = { running: false };
+  function setClub(status) {
+    club = status;
+    const btn = $('#clubBtn');
+    btn.classList.toggle('running', !!club.running);
+    btn.innerHTML = club.running ? '<span class="dot club"></span>Stop club mode' : '<span class="dot club"></span>Club mode';
+    $('#clubStatus').textContent = club.running ? `Running on ${club.devices} lights · stops by itself at ${new Date(club.stopsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
+  }
+  $('#clubBtn').addEventListener('click', async () => {
+    try {
+      if (club.running) {
+        setClub(await api('/effect', { method: 'DELETE' }));
+        toast('Club mode stopped. Pick All white or All warm white to reset the lights.');
+        return;
+      }
+      const ids = visible().filter((d) => d.status === 'ready' && d.kind === 'light' && S.states[d.id]?.online !== false).map((d) => d.id);
+      if (!ids.length) return toast('No online lights shown');
+      setClub(await api('/effect', { body: { effect: 'club', ids } }));
+      const whiteOnly = S.devices.filter((d) => ids.includes(d.id) && !d.capabilities.includes('color')).length;
+      toast(`Club mode on ${ids.length} lights`, whiteOnly ? `${whiteOnly} are white-only bulbs, so they chase and flash in warm/cool white` : null);
+    } catch (e) { toast(e.message, e.hint, true); }
+  });
+  $('#moods').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-kelvin]');
+    if (!b) return;
+    const kelvin = Number(b.dataset.kelvin);
+    group({ type: 'set', on: true, brightness: 100, kelvin }, kelvin >= 5000 ? 'All white' : 'All warm white', { confirmOver: 1000, filter: (d) => d.kind === 'light' });
+  });
+  $('#allOn').addEventListener('click', () => bulk(true));
+  $('#allOff').addEventListener('click', () => bulk(false));
+
+  (async () => {
+    await loadDevices().catch((e) => toast('Cannot reach the iot-hub server', 'Is `iot ui` still running?', true));
+    loadGuide();
+    if (!S.devices.length) scan();
+    else refreshStates();
+    api('/effect').then(setClub).catch(() => {});
+    setInterval(() => {
+      if (document.visibilityState !== 'visible' || S.scanning) return;
+      api('/effect').then(setClub).catch(() => {});
+      // While the club effect runs, states change every half second; polling just adds traffic.
+      if (!club.running) refreshStates();
+    }, 5000);
+    // Pick up devices found by the server's background rescan.
+    setInterval(async () => {
+      if (document.visibilityState !== 'visible' || S.scanning) return;
+      try {
+        const { devices } = await api('/devices');
+        const known = new Set(S.devices.map((d) => d.id));
+        const fresh = devices.filter((d) => !known.has(d.id));
+        if (fresh.length || devices.length !== S.devices.length) {
+          S.devices = devices;
+          renderGrid();
+          if (fresh.length) { toast(`${fresh.length} new device${fresh.length > 1 ? 's' : ''} came online`); refreshStates(fresh.map((d) => d.id)); }
+        }
+      } catch {}
+    }, 30000);
+  })();
+})();
+</script>
+</body>
+</html>
