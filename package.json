@@ -10,7 +10,7 @@
   "scripts": {
     "iot": "tsx src/cli/main.ts",
     "ui": "tsx src/cli/main.ts ui",
-    "build": "tsc && cp src/web/ui.html dist/web/ui.html",
+    "build": "tsc && cp src/web/ui.html src/web/audio.js dist/web/",
     "typecheck": "tsc --noEmit"
   },
   "type": "commonjs",

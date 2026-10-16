@@ -1,5 +1,6 @@
 import { Command, DeviceError, DeviceState, Discovered, DiscoveryContext, Driver } from '../core/types';
 import { clamp, isWhite } from '../util/color';
+import dgram from 'dgram';
 import { settleAll, udpCollect, udpRequest } from '../util/net';
 
 /**
@@ -34,6 +35,31 @@ async function call(ip: string, method: string, params: Record<string, unknown> 
   }
   if (res.error) throw new DeviceError(`WiZ error: ${res.error.message ?? JSON.stringify(res.error)}`);
   return res.result ?? {};
+}
+
+/** setPilot params for a combined `set` command. */
+function pilotParams(device: { colorTempRange?: [number, number] }, cmd: Extract<Command, { type: 'set' }>): Record<string, unknown> {
+  if (cmd.on === false || cmd.brightness === 0) return { state: false };
+  const p: Record<string, unknown> = { state: true };
+  if (cmd.brightness !== undefined) p.dimming = clamp(Math.round(cmd.brightness), 10, 100);
+  if (cmd.rgb && !isWhite(cmd.rgb)) Object.assign(p, cmd.rgb);
+  else if (cmd.rgb || cmd.kelvin !== undefined) {
+    const [min, max] = device.colorTempRange ?? [2200, 6500];
+    p.temp = clamp(cmd.kelvin ?? 4000, min, max);
+  }
+  return p;
+}
+
+// One shared socket for streaming: creating a socket per packet costs time at 25 fps x 54 bulbs.
+let streamSocket: dgram.Socket | undefined;
+function streamSend(ip: string, params: Record<string, unknown>) {
+  if (!streamSocket) {
+    streamSocket = dgram.createSocket('udp4');
+    streamSocket.on('error', () => {});
+    streamSocket.on('message', () => {}); // acks are ignored
+    streamSocket.unref();
+  }
+  streamSocket.send(JSON.stringify({ method: 'setPilot', params }), PORT, ip, () => {});
 }
 
 /** Capabilities from the module name, e.g. ESP01_SHRGB1C_31, ESP06_SHDW9_01, ESP10_SOCKET_06. */
@@ -118,27 +144,22 @@ export const wiz: Driver = {
     return [await identify(ip)];
   },
 
-  async getState(device) {
-    return toState(await call(device.address, 'getPilot'));
+  async getState(device, ctx) {
+    return toState(await call(device.address, 'getPilot', {}, ctx?.fast));
   },
 
   nativeSet: true,
 
+  stream(device, cmd) {
+    streamSend(device.address, pilotParams(device, cmd));
+  },
+
   async execute(device, cmd: Command, ctx) {
     const ip = device.address;
     switch (cmd.type) {
-      case 'set': {
-        if (cmd.on === false || cmd.brightness === 0) return void (await call(ip, 'setPilot', { state: false }, ctx.fast));
-        const p: Record<string, unknown> = { state: true };
-        if (cmd.brightness !== undefined) p.dimming = clamp(Math.round(cmd.brightness), 10, 100);
-        if (cmd.rgb && !isWhite(cmd.rgb)) Object.assign(p, cmd.rgb);
-        else if (cmd.rgb || cmd.kelvin !== undefined) {
-          const [min, max] = device.colorTempRange ?? [2200, 6500];
-          p.temp = clamp(cmd.kelvin ?? 4000, min, max);
-        }
-        await call(ip, 'setPilot', p, ctx.fast);
+      case 'set':
+        await call(ip, 'setPilot', pilotParams(device, cmd), ctx.fast);
         return;
-      }
       case 'power':
         await call(ip, 'setPilot', { state: cmd.on });
         return;

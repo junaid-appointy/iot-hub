@@ -52,6 +52,7 @@
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     background: var(--bg);
@@ -202,6 +203,92 @@
     .search { width: 100%; order: 5; }
     .brand { width: 100%; }
   }
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 10px; }
+  .tabs button { border: 0; background: transparent; padding: 5px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 550; }
+  .tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+  /* Matrix */
+  .mx { display: grid; grid-template-columns: minmax(0, 1fr) 410px; gap: 20px; padding-top: 20px; align-items: start; }
+  .mx-stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 10px; align-self: flex-start; }
+  .seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 550; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+  .mx-board { background: #111110; border-radius: 18px; padding: 18px; display: flex; justify-content: center; }
+  .mx-grid { display: grid; gap: 10px; width: 100%; max-width: 440px; user-select: none; touch-action: none; }
+  .mx-cell {
+    --v: 0; position: relative; aspect-ratio: 1; border-radius: 50%; border: 1.5px solid #3a3936; background: #1c1b19; color: #8c8980;
+    cursor: pointer; padding: 0; display: grid; place-items: center; transition: background .18s, box-shadow .18s, border-color .18s;
+  }
+  .mx-grid .mx-cell.lit { border-style: solid; background: color-mix(in srgb, var(--glow, #fff4e0) calc(var(--v) * 100%), #1c1b19); box-shadow: 0 0 calc(var(--v) * 22px) color-mix(in srgb, var(--glow, #fff4e0) calc(var(--v) * 70%), transparent); border-color: color-mix(in srgb, var(--glow, #fff4e0) calc(var(--v) * 80%), #3a3936); color: #2a2824; }
+  .mx-cell.empty { border-style: dashed; background: transparent; color: #5c5a54; }
+  .mx-cell.selected { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .mx-cell.flashing { animation: mxflash .6s steps(1) infinite; }
+  @keyframes mxflash { 50% { background: #fff; box-shadow: 0 0 24px #fff; color: #222; } }
+  .mx-cell .num { font-weight: 700; font-size: clamp(11px, 2.4vw, 15px); font-variant-numeric: tabular-nums; line-height: 1; }
+  .mx-cell .lbl { position: absolute; bottom: 14%; font-size: 9.5px; opacity: .8; font-family: ui-monospace, Menlo, monospace; }
+  .mx-cell.mapped:not(.lit) { border-color: #6b5a3a; color: #d9c49a; }
+  .mx-foot { color: var(--muted); font-size: 13px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .mx-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; }
+  .mx-panel h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  .mx-panel .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  label.f { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+  .callout { padding: 12px; border-radius: 12px; background: var(--accent-soft); color: var(--text); display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; }
+  .callout strong { color: var(--accent); }
+  .btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
+  .bulb-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+  .bulb-list button { display: flex; justify-content: space-between; gap: 8px; text-align: left; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 13px; }
+  .bulb-list button:hover, .bulb-list button.on { border-color: var(--accent); }
+  .bulb-list small { color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+  .patterns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .patterns button { text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 550; }
+  .patterns button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .desc { font-size: 12.5px; color: var(--muted); }
+  .send-toggle { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); }
+  .send-toggle.live { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); }
+  .slider-row { display: grid; grid-template-columns: 90px 1fr 54px; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .slider-row output { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+  /* Audio */
+  .meters { display: flex; align-items: flex-end; gap: 12px; margin-top: 12px; }
+  .bands { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; height: 64px; flex: 1; }
+  .bar { position: relative; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+  .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, var(--accent), #fbbf24); transition: height 60ms linear; }
+  .meter-side { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 64px; }
+  .beat-dot { width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); }
+  .beat-dot.hit { animation: beathit .35s ease-out; }
+  @keyframes beathit { from { background: var(--accent); box-shadow: 0 0 18px var(--accent); } to { background: var(--surface-2); box-shadow: none; } }
+  .level { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 8px; }
+  .level i { display: block; height: 100%; width: 0; background: var(--ok); transition: width 60ms linear; }
+  .source-on { border-color: var(--ok) !important; }
+
+  .pill.ok { background: color-mix(in srgb, var(--ok) 16%, var(--surface)); color: var(--ok); }
+  .bar-dots { display: flex; gap: 4px; }
+  .bar-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-2); }
+  .bar-dots i:first-child { border: 1px solid var(--faint); }
+  .bar-dots i.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .autopilot { padding: 12px; border-radius: 12px; border: 1px solid var(--border); }
+  .autopilot.on { border-color: var(--accent); background: var(--accent-soft); }
+  .chip-s { color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .tap-pad { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; height: 150px; border-radius: 16px; border: 2px dashed var(--border); background: var(--surface-2); font-size: 18px; font-weight: 650; cursor: pointer; user-select: none; touch-action: none; }
+  .tap-pad small { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .tap-pad.hit { animation: tappad .2s ease-out; }
+  @keyframes tappad { from { background: var(--accent-soft); border-color: var(--accent); transform: scale(.98); } }
+
+  /* Show */
+  .timeline-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+  .timeline-wrap canvas { width: 100%; height: 140px; display: block; cursor: pointer; }
+  .transport { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .transport .time { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--muted); margin-left: auto; }
+  .cues { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
+  .cue { display: grid; grid-template-columns: 70px 1fr 62px 46px 22px; gap: 5px; align-items: center; padding: 4px; border-radius: 8px; }
+  .cue.now { background: var(--accent-soft); }
+  .cue input.field, .cue select.field { height: 28px; font-size: 12.5px; padding: 0 6px; }
+  .cue .x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; }
+  .cue label { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+
+  @media (max-width: 900px) { .mx { grid-template-columns: 1fr; } .mx-panel { position: static; max-height: none; } }
+
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: .01s !important; } }
 </style>
 </head>
@@ -209,6 +296,7 @@
 <header>
   <div class="wrap bar">
     <div class="brand"><h1>iot-hub</h1><span class="summary" id="summary"></span></div>
+    <nav class="tabs" role="tablist"><button role="tab" data-view="devices" aria-selected="true">Devices</button><button role="tab" data-view="matrix" aria-selected="false">Matrix</button></nav>
     <input class="search" id="search" type="search" placeholder="Filter by name, brand, IP…" aria-label="Filter devices" />
     <button class="btn" id="addBtn" title="Add a device by IP address">Add by IP</button>
     <button class="btn primary" id="scanBtn">Scan network</button>
@@ -217,6 +305,8 @@
 
 <main class="wrap">
   <div class="banner" id="offlineBanner" hidden>Lost connection to the iot-hub server. Is <code>npm run ui</code> still running in your terminal? Retrying…</div>
+  <section id="matrixView" hidden></section>
+  <div id="devicesView">
   <div class="toolbar" id="toolbar" hidden>
     <div class="chips" id="chips"></div>
     <button class="btn small" id="allOn">Turn on shown</button>
@@ -243,10 +333,12 @@
     <summary>Troubleshooting <span class="sub">— a device isn't showing up or won't respond</span></summary>
     <div class="table-wrap" id="guide"></div>
   </details>
+  </div>
 </main>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
+<script src="/audio.js"></script>
 <script>
 (() => {
   const BRANDS = { wiz: 'WiZ', hue: 'Hue', kasa: 'Kasa', yeelight: 'Yeelight', lifx: 'LIFX', tuya: 'Tuya', shelly: 'Shelly', wled: 'WLED', nanoleaf: 'Nanoleaf' };
@@ -790,9 +882,1018 @@
   $('#allOn').addEventListener('click', () => bulk(true));
   $('#allOff').addEventListener('click', () => bulk(false));
 
+  // ---------- matrix ----------
+  const PALETTES = [['dual', 'Warm + cool (the look decides)'], ['cool', 'Cool white'], ['warm', 'Warm white'], ['neutral', 'Neutral white']];
+  const PALETTE_K = { cool: 6500, warm: 2700, neutral: 4000 };
+  const MX = {
+    info: null, mode: 'map', pattern: 'wipe', params: {}, selectedCell: null, picked: null,
+    wizard: null, // { current, skipped: Set, history: [] }
+    options: { tickMs: 600, maxBrightness: 100, kelvin: 6500, palette: 'dual', background: 'off', preview: true },
+    brush: 1, painting: false,
+  };
+  const mxRunning = () => !!MX.info?.status?.running;
+  const short = (name) => (name || '').replace(/^WiZ (Light|Plug) /, '');
+
+  function showView(view) {
+    document.querySelectorAll('.tabs [data-view]').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === view));
+    $('#devicesView').hidden = view !== 'devices';
+    $('#matrixView').hidden = view !== 'matrix';
+    ['#search', '#addBtn', '#scanBtn'].forEach((s) => ($(s).hidden = view !== 'devices'));
+    try { localStorage.setItem('iot-hub:view', view); } catch {}
+    if (view === 'matrix') loadMatrix();
+  }
+  document.querySelector('.tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) showView(b.dataset.view); });
+
+  async function loadMatrix() {
+    try { MX.info = await api('/matrix'); } catch (e) { return toast(e.message, e.hint, true); }
+    renderMatrix();
+  }
+
+  function renderMatrix() {
+    const root = $('#matrixView');
+    const info = MX.info;
+    if (!info.layout) {
+      root.innerHTML = `
+        <div class="empty" style="padding:60px 16px">
+          <h2>Set up your light matrix</h2>
+          <p>Tell me the grid size, then map each bulb to its spot by watching it flash.</p>
+          <form id="mxCreate" class="btnrow" style="justify-content:center;align-items:end">
+            <label class="f" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;text-align:left">Rows<input class="field" name="rows" type="number" min="1" max="32" value="9" style="width:90px" /></label>
+            <label class="f" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;text-align:left">Lights per row<input class="field" name="cols" type="number" min="1" max="32" value="6" style="width:110px" /></label>
+            <button class="btn primary">Create grid</button>
+          </form>
+          <p class="desc" style="margin-top:14px">Saved in the repo at <code>layouts/auditorium.json</code>.</p>
+        </div>`;
+      $('#mxCreate').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        MX.info = await api('/matrix/create', { body: { rows: +f.get('rows'), cols: +f.get('cols') } }).catch((err) => (toast(err.message, err.hint, true), MX.info));
+        renderMatrix();
+      });
+      return;
+    }
+    const { rows, cols } = info.layout;
+    root.innerHTML = `
+      <div class="mx">
+        <div class="mx-stage">
+          <div class="seg" id="mxModes">
+            <button data-mode="map" aria-pressed="${MX.mode === 'map'}">Map bulbs</button>
+            <button data-mode="play" aria-pressed="${MX.mode === 'play'}">Patterns</button>
+            <button data-mode="draw" aria-pressed="${MX.mode === 'draw'}">Draw</button>
+            <button data-mode="audio" aria-pressed="${MX.mode === 'audio'}">Audio</button>
+            <button data-mode="show" aria-pressed="${MX.mode === 'show'}">Show</button>
+          </div>
+          <div class="mx-board"><div class="mx-grid" id="mxGrid" style="grid-template-columns:repeat(${cols},1fr)"></div></div>
+          <div class="mx-foot" id="mxFoot"></div>
+          ${MX.mode === 'show' ? '<div class="timeline-wrap"><canvas id="timeline" aria-label="Show timeline: click to jump"></canvas></div>' : ''}
+        </div>
+        <aside class="mx-panel" id="mxPanel"></aside>
+      </div>`;
+    $('#mxModes').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-mode]');
+      if (!b || b.dataset.mode === MX.mode) return;
+      setMode(b.dataset.mode);
+    });
+    const grid = $('#mxGrid');
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const b = document.createElement('button');
+      b.className = 'mx-cell';
+      b.dataset.r = r; b.dataset.c = c;
+      b.innerHTML = '<span class="num"></span><span class="lbl"></span>';
+      grid.append(b);
+    }
+    grid.addEventListener('pointerdown', onCellDown);
+    // Track the pointer position (not pointerover): touch captures the pointer, and fast drags skip cells.
+    grid.addEventListener('pointermove', (e) => {
+      if (!MX.painting) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.mx-cell');
+      if (el && el !== MX.lastPainted) paintAt(el);
+    });
+    window.addEventListener('pointerup', () => { MX.painting = false; MX.lastPainted = null; });
+    $('#timeline')?.addEventListener('click', (e) => {
+      if (!SHOW.show) return;
+      const b = e.currentTarget.getBoundingClientRect();
+      seek(((e.clientX - b.left) / b.width) * SHOW.show.audio.duration);
+    });
+    updateCells();
+    renderPanel();
+    drawTimeline();
+  }
+
+  function cellAt(r, c) { return MX.info.layout.cells[r][c]; }
+  function lightById(id) { return MX.info.lights.find((l) => l.id === id) || S.devices.find((d) => d.id === id); }
+
+  function updateCells() {
+    const info = MX.info;
+    if (!info?.layout) return;
+    const frame = info.status?.frame || [];
+    const showFrame = MX.mode !== 'map' && (info.status?.running);
+    const pal = info.status?.options?.palette || MX.options.palette;
+    const warm = info.status?.warm;
+    const glowFor = (r, c) => kelvinToRgb(pal === 'dual' ? 2700 + (warm?.[r]?.[c] ?? 1) * 3800 : PALETTE_K[pal] ?? MX.options.kelvin);
+    const flashing = info.status?.identifying;
+    let mapped = 0;
+    $('#mxGrid')?.querySelectorAll('.mx-cell').forEach((el) => {
+      const r = +el.dataset.r, c = +el.dataset.c;
+      const id = cellAt(r, c);
+      if (id) mapped++;
+      const v = showFrame ? frame[r]?.[c] ?? 0 : 0;
+      el.querySelector('.num').textContent = info.numbers[r][c];
+      el.querySelector('.lbl').textContent = id ? short(lightById(id)?.name) : '';
+      el.classList.toggle('empty', !id);
+      el.classList.toggle('mapped', !!id);
+      el.classList.toggle('lit', v > 0);
+      el.classList.toggle('selected', MX.mode === 'map' && MX.selectedCell?.[0] === r && MX.selectedCell?.[1] === c);
+      el.classList.toggle('flashing', !!id && id === flashing);
+      el.style.setProperty('--v', v);
+      el.style.setProperty('--glow', glowFor(r, c));
+      el.title = `#${info.numbers[r][c]} · row ${r + 1}, column ${c + 1}${id ? ' · ' + (lightById(id)?.name || id) : ' · empty'}`;
+    });
+    const total = info.layout.rows * info.layout.cols;
+    const unplaced = info.lights.filter((l) => !l.assigned).length;
+    const s = info.status;
+    $('#mxFoot').innerHTML = [
+      `<span><strong>${mapped}</strong> of ${total} cells mapped</span>`,
+      unplaced ? `<span>${unplaced} bulb${unplaced === 1 ? '' : 's'} not placed</span>` : '',
+      s?.running ? `<span>▶ ${esc(MX.info.patterns.find((p) => p.id === s.pattern)?.name || s.pattern)}${s.options?.preview ? ' · preview only' : ' · on real bulbs'}</span>` : '',
+      '<span class="mono">layouts/auditorium.json</span>',
+    ].filter(Boolean).join('');
+  }
+
+  async function setMode(mode) {
+    if (MX.wizard) await stopWizard();
+    if (MX.mode === 'audio' && mode !== 'audio') { stopSource(); if (MX.info.status?.director === 'autopilot') await api('/matrix/autopilot', { body: { on: false } }).catch(() => {}); }
+    if (MX.mode === 'show' && mode !== 'show') showStop();
+    MX.mode = mode;
+    MX.selectedCell = null;
+    if (mode !== 'audio' && mode !== 'show') await setSource('metronome');
+    if (mode === 'draw') await play('draw');
+    if (mode === 'show') await loadShowList();
+    renderMatrix();
+  }
+
+  // ---- map mode ----
+  async function assignCell(r, c, id) {
+    MX.info = await api('/matrix/assign', { body: { row: r, col: c, id } });
+  }
+
+  async function onCellDown(e) {
+    const el = e.target.closest('.mx-cell');
+    if (!el) return;
+    const r = +el.dataset.r, c = +el.dataset.c;
+    if (MX.mode === 'draw') { e.target.releasePointerCapture?.(e.pointerId); MX.painting = true; MX.paintValue = (MX.info.status?.frame?.[r]?.[c] ?? 0) > 0 ? 0 : MX.brush; paintAt(el); return; }
+    if (MX.mode !== 'map') return;
+    try {
+      const target = MX.wizard?.current || MX.picked;
+      if (target) {
+        const replaced = cellAt(r, c);
+        await assignCell(r, c, target);
+        api('/matrix/identify-stop', { body: { after: 'dim' } }).catch(() => {});
+        if (replaced && replaced !== target) toast(`Replaced ${short(lightById(replaced)?.name)}; it's back in the unplaced list`);
+        if (MX.wizard) { MX.wizard.history.push(target); await nextWizard(); }
+        else { MX.picked = null; MX.selectedCell = null; }
+      } else {
+        MX.selectedCell = MX.selectedCell?.[0] === r && MX.selectedCell?.[1] === c ? null : [r, c];
+      }
+    } catch (err) { toast(err.message, err.hint, true); }
+    updateCells();
+    renderPanel();
+  }
+
+  async function flash(id) {
+    try { MX.info.status = await api('/matrix/identify', { body: { id } }); } catch (e) { toast(e.message, e.hint, true); }
+    updateCells();
+  }
+
+  async function startWizard() {
+    const unplaced = MX.info.lights.filter((l) => !l.assigned);
+    if (!unplaced.length) return toast('Every bulb is already placed');
+    if (!confirm(`Mapping turns off the ${unplaced.length} unplaced bulbs, dims the placed ones, and flashes one bulb at a time. Start?`)) return;
+    MX.wizard = { current: null, skipped: new Set(), history: [] };
+    MX.picked = null;
+    renderPanel();
+    try { await api('/matrix/prepare-mapping', { method: 'POST' }); } catch (e) { toast(e.message, e.hint, true); }
+    await nextWizard();
+  }
+
+  async function nextWizard() {
+    MX.info = await api('/matrix');
+    const next = MX.info.lights.find((l) => !l.assigned && !MX.wizard.skipped.has(l.id));
+    if (!next) {
+      const skipped = MX.wizard.skipped.size;
+      MX.wizard = null;
+      await api('/matrix/identify-stop', { body: {} }).catch(() => {});
+      toast(skipped ? `Mapping done · ${skipped} bulb${skipped === 1 ? '' : 's'} skipped` : 'Every bulb is placed 🎉');
+      MX.info = await api('/matrix');
+    } else {
+      MX.wizard.current = next.id;
+      await flash(next.id);
+    }
+    updateCells();
+    renderPanel();
+  }
+
+  async function stopWizard() {
+    MX.wizard = null;
+    await api('/matrix/identify-stop', { body: { after: 'off' } }).catch(() => {});
+    MX.info = await api('/matrix');
+    updateCells();
+    renderPanel();
+  }
+
+  async function saveNumbering(patch) {
+    try {
+      MX.info = await api('/matrix', { method: 'PUT', body: { numbering: { ...MX.info.layout.numbering, ...patch } } });
+      updateCells();
+    } catch (e) { toast(e.message, e.hint, true); }
+  }
+
+  function mapPanel() {
+    const info = MX.info, n = info.layout.numbering;
+    const unplaced = info.lights.filter((l) => !l.assigned);
+    const sel = MX.selectedCell;
+    const selId = sel && cellAt(sel[0], sel[1]);
+    let html = '';
+    if (MX.wizard) {
+      const cur = lightById(MX.wizard.current);
+      const left = info.lights.filter((l) => !l.assigned && !MX.wizard.skipped.has(l.id)).length;
+      html += `<div class="callout">
+        <div><strong>Find the flashing bulb</strong> and click its spot on the grid.</div>
+        <div class="desc">${esc(cur?.name || '')} · <span class="mono">${esc(cur?.address || '')}</span> · ${left} to go</div>
+        <div class="btnrow">
+          <button class="btn small" data-act="skip">Can't see it, skip</button>
+          ${MX.wizard.history.length ? '<button class="btn small" data-act="undo">Undo last</button>' : ''}
+          <button class="btn small ghost" data-act="stop-wizard">Stop</button>
+        </div></div>`;
+    } else {
+      html += `<div><h4>Map bulbs to cells</h4>
+        <p class="desc" style="margin:0 0 10px">Each bulb flashes in turn; click where it is. Placed bulbs stay dim so you can see progress in the room.</p>
+        <button class="btn primary" data-act="start-wizard" ${unplaced.length ? '' : 'disabled'}>${unplaced.length ? `Start mapping (${unplaced.length} unplaced)` : 'All bulbs placed'}</button></div>`;
+    }
+    if (sel && !MX.wizard) {
+      const num = info.numbers[sel[0]][sel[1]];
+      html += selId
+        ? `<div class="callout"><div><strong>#${num}</strong> · row ${sel[0] + 1}, column ${sel[1] + 1}<br><span class="desc">${esc(lightById(selId)?.name || selId)}</span></div>
+            <div class="btnrow"><button class="btn small" data-act="flash" data-id="${esc(selId)}">Flash it</button><button class="btn small" data-act="stop-flash">Stop flashing</button><button class="btn small danger" data-act="unassign">Remove from cell</button></div></div>`
+        : `<div class="callout"><div><strong>#${num}</strong> · row ${sel[0] + 1}, column ${sel[1] + 1} is empty.</div><div class="desc">Pick a bulb below to put it here.</div></div>`;
+    }
+    if (MX.picked && !MX.wizard) html += `<div class="callout"><div><strong>${esc(lightById(MX.picked)?.name)}</strong> is flashing. Click its cell on the grid.</div><div class="btnrow"><button class="btn small ghost" data-act="cancel-pick">Cancel</button></div></div>`;
+    if (unplaced.length && !MX.wizard) {
+      html += `<div><h4>Unplaced bulbs (${unplaced.length})</h4><div class="bulb-list">${unplaced
+        .map((l) => `<button data-act="pick" data-id="${esc(l.id)}" class="${MX.picked === l.id ? 'on' : ''}">${esc(l.name)}<small>${esc(l.address)}</small></button>`).join('')}</div></div>`;
+    }
+    const corner = (v, label) => `<option value="${v}" ${n.start === v ? 'selected' : ''}>${label}</option>`;
+    html += `<div><h4>Numbering</h4>
+      <div class="row2">
+        <label class="f">#1 starts at<select class="field" data-num="start">${corner('top-left', 'Top left')}${corner('top-right', 'Top right')}${corner('bottom-left', 'Bottom left')}${corner('bottom-right', 'Bottom right')}</select></label>
+        <label class="f">Count along<select class="field" data-num="direction"><option value="rows" ${n.direction === 'rows' ? 'selected' : ''}>Rows</option><option value="columns" ${n.direction === 'columns' ? 'selected' : ''}>Columns</option></select></label>
+      </div>
+      <div class="btnrow" style="margin-top:10px;gap:16px">
+        <label class="check"><input type="checkbox" data-num="serpentine" ${n.serpentine ? 'checked' : ''}/> Zigzag</label>
+        <label class="check"><input type="checkbox" data-num="reverse" ${n.reverse ? 'checked' : ''}/> End to start</label>
+      </div></div>
+      <div><h4>Grid</h4><div class="row2">
+        <label class="f">Rows<input class="field" type="number" min="1" max="32" value="${info.layout.rows}" data-size="rows"/></label>
+        <label class="f">Lights per row<input class="field" type="number" min="1" max="32" value="${info.layout.cols}" data-size="cols"/></label></div>
+        <div class="btnrow" style="margin-top:8px"><button class="btn small" data-act="resize">Apply size</button><button class="btn small danger" data-act="clear-map">Clear all mapping</button></div></div>`;
+    return html;
+  }
+
+  // ---- play / draw ----
+  async function play(pattern) {
+    try {
+      MX.info.status = await api('/matrix/play', { body: { pattern, params: MX.params[pattern] || defaultsFor(pattern), options: MX.options } });
+    } catch (e) { toast(e.message, e.hint, true); }
+    updateCells();
+    renderPanel();
+  }
+  function defaultsFor(id) {
+    const p = MX.info.patterns.find((x) => x.id === id);
+    return Object.fromEntries((p?.params || []).map((x) => [x.key, x.default]));
+  }
+  let updateTimer;
+  function pushUpdate(params) {
+    if (!mxRunning()) return;
+    clearTimeout(updateTimer);
+    updateTimer = setTimeout(async () => { try { MX.info.status = await api('/matrix/update', { body: { params, options: MX.options } }); } catch {} }, 250);
+  }
+  async function paintAt(el) {
+    if (!el || MX.mode !== 'draw') return;
+    MX.lastPainted = el;
+    const r = +el.dataset.r, c = +el.dataset.c;
+    const frame = MX.info.status.frame;
+    if (frame[r]) frame[r][c] = MX.paintValue;
+    updateCells();
+    try { MX.info.status = await api('/matrix/pixel', { body: { row: r, col: c, value: MX.paintValue } }); } catch {}
+  }
+
+  function optionsHtml(music = false) {
+    const o = MX.options;
+    const rate = (1000 / o.tickMs).toFixed(1);
+    return `<div><h4>Output</h4>
+      <div class="send-toggle ${o.preview ? '' : 'live'}"><label class="check"><input type="checkbox" data-opt="live" ${o.preview ? '' : 'checked'}/> <strong>Send to real bulbs</strong></label>
+      <div class="desc" style="margin-top:4px">${o.preview ? 'Off: the pattern only plays on this screen.' : 'On: every mapped bulb follows the pattern.'}</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        ${music ? '' : `<label class="slider-row">Speed<input type="range" min="250" max="2000" step="50" value="${2250 - o.tickMs}" data-opt="speed"/><output>${rate}/s</output></label>`}
+        <label class="slider-row">Brightness<input type="range" min="10" max="100" step="10" value="${o.maxBrightness}" data-opt="maxBrightness"/><output>${o.maxBrightness}%</output></label>
+        <div class="row2"><label class="f">White<select class="field" data-opt="palette">${PALETTES.map(([k, l]) => `<option value="${k}" ${k === o.palette ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="f">Unlit bulbs<select class="field" data-opt="background"><option value="off" ${o.background === 'off' ? 'selected' : ''}>Off</option><option value="dim" ${o.background === 'dim' ? 'selected' : ''}>Dim glow</option></select></label></div>
+      </div>
+      ${music ? '' : '<p class="desc" style="margin:8px 0 0">Bulbs react in roughly 0.1–1 s, so fast speeds look smoother on screen than in the room.</p>'}</div>`;
+  }
+
+  function playPanel() {
+    const pats = MX.info.patterns.filter((p) => p.id !== 'draw');
+    const p = pats.find((x) => x.id === MX.pattern) || pats[0];
+    const params = (MX.params[p.id] ??= defaultsFor(p.id));
+    const running = mxRunning() && MX.info.status.pattern === p.id;
+    const paramHtml = (p.params || []).map((x) => {
+      if (x.type === 'toggle') return `<label class="check"><input type="checkbox" data-param="${x.key}" ${params[x.key] ? 'checked' : ''}/> ${esc(x.label)}</label>`;
+      if (x.type === 'select') return `<label class="f">${esc(x.label)}<select class="field" data-param="${x.key}">${x.options.map((o) => `<option value="${o.value}" ${params[x.key] === o.value ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></label>`;
+      return `<label class="f">${esc(x.label)}<input class="field" data-param="${x.key}" value="${esc(params[x.key])}" maxlength="60"/></label>`;
+    }).join('');
+    const btn = (x) => `<button data-pattern="${x.id}" aria-pressed="${x.id === p.id}">${esc(x.name)}</button>`;
+    return `<div><h4>Patterns</h4><div class="patterns">${pats.filter((x) => x.category !== 'music').map(btn).join('')}</div>
+      <h4 style="margin-top:14px">Music looks <span style="text-transform:none;letter-spacing:0;font-weight:400">· here on a 120 BPM metronome; use Audio or Show for real music</span></h4>
+      <div class="patterns">${pats.filter((x) => x.category === 'music').map(btn).join('')}</div>
+      <p class="desc" style="margin:10px 0 0">${esc(p.description)}</p>
+      ${paramHtml ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">${paramHtml}</div>` : ''}
+      <div class="btnrow" style="margin-top:12px">${running ? '<button class="btn" data-act="stop">■ Stop</button>' : '<button class="btn primary" data-act="play">▶ Play</button>'}${mxRunning() && !running ? '<button class="btn" data-act="stop">■ Stop current</button>' : ''}</div></div>
+      ${optionsHtml()}`;
+  }
+
+  function drawPanel() {
+    return `<div><h4>Draw</h4><p class="desc" style="margin:0 0 10px">Click or drag across cells to switch them on and off.</p>
+      <div class="btnrow"><button class="btn small ${MX.brush === 1 ? 'primary' : ''}" data-brush="1">Full</button><button class="btn small ${MX.brush === 0.5 ? 'primary' : ''}" data-brush="0.5">Half</button><button class="btn small" data-act="clear-canvas">Clear</button></div></div>
+      ${optionsHtml()}`;
+  }
+
+  function renderPanel() {
+    const panel = $('#mxPanel');
+    if (!panel) return;
+    panel.innerHTML = { map: mapPanel, play: playPanel, draw: drawPanel, audio: audioPanel, show: showPanel }[MX.mode]();
+  }
+
+  $('#matrixView').addEventListener('click', async (e) => {
+    const t = e.target.closest('[data-act],[data-pattern],[data-brush],[data-music-pattern]');
+    if (!t || !t.closest('#mxPanel')) return;
+    const act = t.dataset.act;
+    try {
+      if (t.dataset.musicPattern) return playWith(t.dataset.musicPattern, { stepOn: 'timer' });
+      if (act === 'src-mic') return startSource('mic');
+      if (act === 'src-system') return startSource('system');
+      if (act === 'src-stop') return stopSource();
+      if (act === 'beat-play') return playWith(AUDIO.beatPattern, { stepOn: 'beat' });
+      if (act === 'autopilot') return setAutopilot(!(MX.info.status?.director === 'autopilot' && MX.info.status.running));
+      if (act === 'cal-network') return calibrateNetwork();
+      if (act === 'cal-tap') return tapTest();
+      if (await onShowAct(act, t)) return;
+      if (t.dataset.pattern) { MX.pattern = t.dataset.pattern; if (mxRunning() && MX.info.status.pattern !== 'draw') await play(MX.pattern); else renderPanel(); return; }
+      if (t.dataset.brush) { MX.brush = +t.dataset.brush; renderPanel(); return; }
+      if (act === 'start-wizard') return startWizard();
+      if (act === 'stop-wizard') return stopWizard();
+      if (act === 'skip') { MX.wizard.skipped.add(MX.wizard.current); await api('/matrix/identify-stop', { body: { after: 'off' } }); return nextWizard(); }
+      if (act === 'undo') {
+        const last = MX.wizard.history.pop();
+        const pos = MX.info.layout.cells.flatMap((row, r) => row.map((id, c) => [id, r, c])).find(([id]) => id === last);
+        if (pos) await assignCell(pos[1], pos[2], null);
+        await api('/matrix/identify-stop', { body: { after: 'off' } });
+        MX.wizard.current = last; await flash(last); renderPanel(); return;
+      }
+      if (act === 'pick') {
+        const id = t.dataset.id;
+        if (MX.selectedCell && !cellAt(...MX.selectedCell)) { await assignCell(...MX.selectedCell, id); MX.selectedCell = null; toast('Placed'); updateCells(); renderPanel(); return; }
+        MX.picked = id; await flash(id); renderPanel(); return;
+      }
+      if (act === 'cancel-pick') { MX.picked = null; await api('/matrix/identify-stop', { body: { after: 'off' } }); MX.info = await api('/matrix'); updateCells(); renderPanel(); return; }
+      if (act === 'flash') return flash(t.dataset.id);
+      if (act === 'stop-flash') { await api('/matrix/identify-stop', { body: { after: 'dim' } }); MX.info = await api('/matrix'); updateCells(); return; }
+      if (act === 'unassign') { await assignCell(...MX.selectedCell, null); MX.selectedCell = null; updateCells(); renderPanel(); return; }
+      if (act === 'resize') {
+        const rows = +$('[data-size=rows]').value, cols = +$('[data-size=cols]').value;
+        MX.info = await api('/matrix/create', { body: { rows, cols } }); renderMatrix(); return;
+      }
+      if (act === 'clear-map') { if (!confirm('Remove every bulb from the grid? The size and numbering stay.')) return; MX.info = await api('/matrix/clear-map', { method: 'POST' }); updateCells(); renderPanel(); return; }
+      if (act === 'play') return play(MX.pattern);
+      if (act === 'stop') { MX.info.status = await api('/matrix/stop', { method: 'POST' }); updateCells(); renderPanel(); return; }
+      if (act === 'clear-canvas') { MX.info.status = await api('/matrix/clear-canvas', { method: 'POST' }); updateCells(); return; }
+    } catch (err) { toast(err.message, err.hint, true); }
+  });
+
+  $('#matrixView').addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.dataset.audio === 'device') { AUDIO.deviceId = t.value; if (AUDIO.source === 'mic') startSource('mic'); return; }
+    if (t.dataset.audio === 'beatPattern') { AUDIO.beatPattern = t.value; return; }
+    if (t.dataset.show === 'open') { if (t.value) openShow(t.value); return; }
+    if (t.dataset.show === 'file') { onSongFile(t.files[0]); return; }
+    if (t.dataset.cue) {
+      const cue = SHOW.show.cues[+t.closest('.cue').dataset.i];
+      if (t.dataset.cue === 't') {
+        const v = parseTime(t.value);
+        if (Number.isNaN(v)) { toast('Use m:ss.s, e.g. 1:23.5', null, true); t.value = fmt(cue.t); return; }
+        cue.t = Math.max(0, Math.min(SHOW.show.audio.duration, v));
+        SHOW.show.cues.sort((a, b) => a.t - b.t);
+      }
+      if (t.dataset.cue === 'pattern') { cue.pattern = t.value; cue.params = undefined; if (isMusicPattern(t.value)) cue.stepOn = 'timer'; }
+      if (t.dataset.cue === 'palette') cue.palette = t.value;
+      if (t.dataset.cue === 'beat') cue.stepOn = t.checked ? 'beat' : 'timer';
+      pushShowEdit();
+      renderPanel(); drawTimeline();
+      return;
+    }
+    if (t.dataset.num) return saveNumbering({ [t.dataset.num]: t.type === 'checkbox' ? t.checked : t.value });
+    if (t.dataset.param !== undefined) {
+      const params = MX.params[MX.pattern];
+      params[t.dataset.param] = t.type === 'checkbox' ? t.checked : t.value;
+      if (mxRunning() && MX.info.status.pattern === MX.pattern) pushUpdate(params);
+      return;
+    }
+    if (t.dataset.opt === 'live') {
+      if (t.checked && !confirm('Send the pattern to the real bulbs?')) { t.checked = false; return; }
+      MX.options.preview = !t.checked; pushUpdate(); renderPanel(); return;
+    }
+    if (t.dataset.opt === 'palette') { MX.options.palette = t.value; pushUpdate(); updateCells(); return; }
+    if (t.dataset.opt === 'background') { MX.options.background = t.value; pushUpdate(); return; }
+  });
+  $('#matrixView').addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.dataset.audio === 'sens') { analyzer().sensitivity = +t.value; t.nextElementSibling.textContent = Math.round(+t.value * 100) + '%'; return; }
+    if (t.dataset.show === 'offset') { SHOW.show.offsetMs = +t.value; t.nextElementSibling.textContent = `${+t.value > 0 ? '+' : ''}${t.value} ms`; pushShowEdit(); return; }
+    if (t.dataset.show === 'name') { SHOW.show.name = t.value; SHOW.dirty = true; const b = $('[data-act=show-save]'); if (b) b.textContent = 'Save show'; return; }
+    if (t.dataset.opt === 'speed') { MX.options.tickMs = 2250 - +t.value; t.nextElementSibling.textContent = (1000 / MX.options.tickMs).toFixed(1) + '/s'; pushUpdate(); }
+    if (t.dataset.opt === 'maxBrightness') { MX.options.maxBrightness = +t.value; t.nextElementSibling.textContent = t.value + '%'; pushUpdate(); }
+    if (t.dataset.param !== undefined && t.type === 'text') { MX.params[MX.pattern][t.dataset.param] = t.value; if (mxRunning() && MX.info.status.pattern === MX.pattern) pushUpdate(MX.params[MX.pattern]); }
+  });
+
+  // Live frames while something is playing or flashing (faster when sound drives it).
+  (function pollFrames() {
+    const fast = mxRunning() && (MX.mode === 'audio' || MX.mode === 'show' || MX.mode === 'play');
+    setTimeout(async () => {
+      if (!$('#matrixView').hidden && MX.info?.layout && document.visibilityState === 'visible' && (mxRunning() || MX.info.status?.identifying)) {
+        try { MX.info.status = await api('/matrix/status'); updateCells(); } catch {}
+      }
+      pollFrames();
+    }, fast ? 100 : 400);
+  })();
+
+  // ---------- audio: live sound → matrix ----------
+  const AUDIO = { analyzer: null, source: null, devices: [], deviceId: '', unsub: null, error: '', last: null, beatPattern: 'chase' };
+  const analyzer = () => (AUDIO.analyzer ??= new IotAudio.LiveAnalyzer());
+  const isMusicPattern = (id) => MX.info?.patterns.find((p) => p.id === id)?.category === 'music';
+
+  /**
+   * Live data to the server, batched per analysis frame: predicted groove hits
+   * (sent ~0.6 s ahead so bulbs land on time), unpredicted onsets (sent at once),
+   * the tempo grid whenever it moves, and levels/bands ~10x a second.
+   */
+  const OUT = { hits: [], grid: undefined, lastGridKey: '', lastFeat: 0, lastSend: 0 };
+  function queueLive(f) {
+    const tr = analyzer().tracker, now = IotAudio.wallNow();
+    OUT.hits.push(...tr.predictions(now, 700));
+    for (const o of f.onsets) if (!tr.wasPredicted(o.type, o.at)) OUT.hits.push(o);
+    // Until the beat is locked, kicks double as beats so beat-driven looks still move.
+    if (!tr.locked) for (const o of f.onsets) if (o.type === 'kick') OUT.hits.push({ ...o, type: 'beat' });
+    const g = tr.grid();
+    const key = g ? `${g.anchorBeat}:${g.locked}:${g.downbeat}` : 'none';
+    if (key !== OUT.lastGridKey) { OUT.grid = g; OUT.lastGridKey = key; }
+    const featDue = now - OUT.lastFeat > 100;
+    if (!OUT.hits.length && OUT.grid === undefined && !featDue) return;
+    const body = {};
+    if (OUT.hits.length) body.hits = OUT.hits.splice(0);
+    if (OUT.grid !== undefined) { body.grid = OUT.grid; OUT.grid = undefined; }
+    if (featDue) { body.level = f.level; body.bands = f.bands; OUT.lastFeat = now; }
+    fetch('/api/audio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify(body) }).catch(() => {});
+  }
+
+  function attachAnalyzer(sendLive) {
+    AUDIO.unsub?.();
+    AUDIO.unsub = analyzer().onFeatures((f) => {
+      AUDIO.last = f;
+      if (sendLive) queueLive(f);
+      drawMeters(f);
+    });
+  }
+
+  async function setSource(kind) {
+    try { MX.info.status = await api('/matrix/source', { body: { kind } }); } catch {}
+  }
+
+  async function startSource(kind) {
+    AUDIO.error = '';
+    if (SHOW.playing) showPause();
+    const a = analyzer();
+    a.onEnded = () => { AUDIO.source = null; toast('Sound sharing ended'); renderPanel(); };
+    try {
+      if (kind === 'mic') await a.useMicrophone(AUDIO.deviceId || undefined);
+      else await a.useSystemAudio();
+      AUDIO.source = kind;
+      attachAnalyzer(true);
+      await setSource('live');
+      if (kind === 'mic') AUDIO.devices = await IotAudio.LiveAnalyzer.inputDevices?.() ?? (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput').map((d, i) => ({ id: d.deviceId, label: d.label || `Input ${i + 1}` }));
+    } catch (e) {
+      AUDIO.source = null;
+      AUDIO.error = e.name === 'NotAllowedError'
+        ? (kind === 'mic' ? 'Microphone access was blocked. Allow it from the icon in the address bar, then try again.' : 'Sharing was cancelled.')
+        : e.name === 'NotFoundError' ? 'No microphone found.' : e.message;
+    }
+    renderPanel();
+  }
+
+  function stopSource() {
+    AUDIO.analyzer?.stop();
+    AUDIO.unsub?.();
+    AUDIO.source = null;
+    setSource('metronome');
+    if (MX.mode === 'audio') renderPanel();
+  }
+
+  function drawMeters(f) {
+    const m = $('#meters');
+    if (!m) return;
+    m.querySelectorAll('.bar i').forEach((el, i) => (el.style.height = Math.round((f.bands[i] ?? 0) * 100) + '%'));
+    const lvl = $('#levelBar');
+    if (lvl) lvl.style.width = Math.round(f.level * 100) + '%';
+    if (f.beat) { const d = $('#beatDot'); if (d) { d.classList.remove('hit'); void d.offsetWidth; d.classList.add('hit'); } }
+    const tr = analyzer().tracker;
+    const lock = $('#lockBadge');
+    if (lock) {
+      lock.className = 'pill ' + (tr.locked ? 'ok' : 'warn');
+      lock.textContent = tr.locked ? `Locked · ${tr.bpm} BPM` : tr.bpm ? `Finding the beat… ${tr.bpm} BPM` : 'Listening…';
+    }
+    const dots = $('#barDots');
+    if (dots && tr.period) {
+      const now = IotAudio.wallNow();
+      const beatsFromNext = (now - tr.nextBeat) / tr.period;
+      const beatNow = Math.floor(tr.beatIndex + beatsFromNext);
+      const inBar = (((beatNow - tr.downSlot) % 4) + 4) % 4;
+      dots.querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i === inBar && tr.locked));
+    }
+  }
+
+  const metersHtml = () => `
+    <div id="meters" class="meters">
+      <div class="bands">${['Sub', 'Bass', 'Low mid', 'Mid', 'Presence', 'Treble'].map((n) => `<div class="bar" title="${n}"><i></i></div>`).join('')}</div>
+      <div class="meter-side"><span id="beatDot" class="beat-dot" title="Kick"></span><span id="barDots" class="bar-dots" title="Beat in the bar"><i></i><i></i><i></i><i></i></span></div>
+    </div>
+    <div class="level" title="Loudness"><i id="levelBar"></i></div>
+    <div class="btnrow" style="margin-top:8px;align-items:center"><span id="lockBadge" class="pill warn">Listening…</span><span class="desc">Locks after a few bars of steady beat; then lights are sent ahead so they land on the beat.</span></div>`;
+
+  async function playWith(pattern, overrides = {}, params) {
+    try {
+      MX.info.status = await api('/matrix/play', { body: { pattern, params: params || MX.params[pattern] || defaultsFor(pattern), options: { ...MX.options, ...overrides } } });
+    } catch (e) { toast(e.message, e.hint, true); }
+    updateCells();
+    renderPanel();
+  }
+
+  async function setAutopilot(on) {
+    try { MX.info.status = await api('/matrix/autopilot', { body: { on, options: MX.options } }); } catch (e) { toast(e.message, e.hint, true); }
+    if (on && !AUDIO.source) toast('Autopilot is on', 'Start the microphone or system sound so it has music to follow.');
+    renderPanel();
+  }
+
+  function audioPanel() {
+    const a = AUDIO, src = a.source, st = MX.info.status;
+    const music = MX.info.patterns.filter((p) => p.category === 'music');
+    const basic = MX.info.patterns.filter((p) => p.category !== 'music' && !['draw', 'fill'].includes(p.id));
+    const auto = st?.director === 'autopilot' && st.running;
+    return `
+      <div><h4>Sound source</h4>
+        <div class="btnrow">
+          <button class="btn small ${src === 'mic' ? 'source-on' : ''}" data-act="src-mic">🎤 Microphone${src === 'mic' ? ' · on' : ''}</button>
+          <button class="btn small ${src === 'system' ? 'source-on' : ''}" data-act="src-system">🔊 System sound${src === 'system' ? ' · on' : ''}</button>
+          ${src ? '<button class="btn small ghost" data-act="src-stop">Stop listening</button>' : ''}
+        </div>
+        ${a.devices.length > 1 ? `<label class="f" style="margin-top:8px">Input device<select class="field" data-audio="device">${a.devices.map((d) => `<option value="${esc(d.id)}" ${d.id === a.deviceId ? 'selected' : ''}>${esc(d.label)}</option>`).join('')}</select></label>` : ''}
+        ${a.error ? `<div class="msg warn" style="margin-top:8px">${esc(a.error)}</div>` : ''}
+        ${src ? '' : `<p class="desc" style="margin:8px 0 0"><strong>System sound</strong>: Chrome asks what to share — pick a <strong>tab</strong> (Spotify Web, YouTube…) with “Share tab audio” on, or the <strong>entire screen</strong> with “Share system audio”. For desktop apps on a Mac, use a loopback device (e.g. BlackHole) as the microphone.</p>`}
+        ${metersHtml()}
+        <label class="slider-row" style="margin-top:10px">Hit sensitivity<input type="range" min="0.6" max="1.6" step="0.05" value="${analyzer().sensitivity}" data-audio="sens"/><output>${Math.round(analyzer().sensitivity * 100)}%</output></label>
+      </div>
+      <div class="autopilot ${auto ? 'on' : ''}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><strong>Autopilot · DJ mode</strong>
+            <div class="desc">Picks looks to the music: changes every 8 bars, rides build-ups, slams a blinder on the drop.</div></div>
+          <button class="switch" role="switch" aria-checked="${auto}" data-act="autopilot" aria-label="Autopilot"></button>
+        </div>
+        ${auto ? `<div class="desc" style="margin-top:8px">Now: <strong>${esc(st.autopilot?.label || '')}</strong> · ${esc(MX.info.patterns.find((p) => p.id === st.pattern)?.name || st.pattern || '')}</div>` : ''}
+      </div>
+      <div><h4>Or pick a look</h4>
+        <div class="patterns">${music.map((p) => `<button data-music-pattern="${p.id}" title="${esc(p.description)}" aria-pressed="${!!st?.running && !auto && st.pattern === p.id}">${esc(p.name)}</button>`).join('')}</div>
+        <p class="desc" style="margin:8px 0 0">${esc(music.find((p) => p.id === st?.pattern)?.description || 'Each look follows the beat, bars and drum hits.')}</p>
+        <div class="row2" style="margin-top:10px"><select class="field" data-audio="beatPattern">${basic.map((p) => `<option value="${p.id}" ${p.id === a.beatPattern ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+        <button class="btn small" data-act="beat-play" title="Advance this pattern one step per beat">Step on the beat</button></div>
+      </div>
+      ${st?.running ? '<div class="btnrow"><button class="btn" data-act="stop">■ Stop</button></div>' : ''}
+      ${optionsHtml(true)}
+      ${syncHtml()}`;
+  }
+
+  // ---------- sync calibration ----------
+  function syncHtml() {
+    const cal = MX.info.calibration || {};
+    const lat = MX.info.latency || {};
+    const rtts = Object.values(cal.bulbs || {}).map((b) => b.rttMs).filter((x) => typeof x === 'number');
+    const unreachable = Object.values(cal.bulbs || {}).filter((b) => b.rttMs === null).length;
+    const when = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
+    return `<div><h4>Sync</h4>
+      <div class="desc">Light delay <strong>${lat.baseMs ?? '–'} ms</strong> · ${cal.lightSource === 'tap' ? `tap-calibrated ${when(cal.lightMeasuredAt)}` : 'estimated — run the tap test for exact sync'}</div>
+      <div class="desc">${rtts.length ? `Network: ${rtts.length} bulbs measured ${when(cal.networkMeasuredAt)} · slowest ${Math.max(...rtts)} ms round trip${unreachable ? ` · ${unreachable} didn't answer` : ''}` : 'Network delay not measured yet.'}</div>
+      <div class="btnrow" style="margin-top:8px"><button class="btn small" data-act="cal-network">Measure network</button><button class="btn small" data-act="cal-tap">Tap test…</button></div>
+      <p class="desc" style="margin:6px 0 0">Each bulb gets its commands early by its own delay, so all ${Object.keys(lat.perBulb || {}).length || 'the'} bulbs change together, on the beat.</p></div>`;
+  }
+
+  async function calibrateNetwork() {
+    toast('Measuring every bulb… (about 2 s)');
+    try {
+      const r = await api('/matrix/calibrate-network', { method: 'POST' });
+      MX.info = await api('/matrix');
+      toast(`Measured: median ${r.medianMs} ms round trip${r.unreachable.length ? ` · ${r.unreachable.length} didn't answer` : ''}`, r.slowest.length ? `Slowest: ${r.slowest.slice(0, 3).map((s) => `${s.name} ${s.rttMs} ms`).join(', ')}` : null);
+    } catch (e) { toast(e.message, e.hint, true); }
+    renderPanel();
+  }
+
+  /** Guided tap test: taps to clicks (sound), then taps to flashes (light). Personal tap timing cancels out. */
+  async function tapTest() {
+    const m = modal('Sync calibration');
+    const ctx = (await analyzer().ensureContext(), analyzer().ctx);
+    const result = {};
+    let taps = [];
+    const onKey = (e) => { if (e.code === 'Space') { e.preventDefault(); taps.push(IotAudio.wallNow()); flashPad(); } };
+    const flashPad = () => { const p = $('#tapPad', m.body); if (p) { p.classList.remove('hit'); void p.offsetWidth; p.classList.add('hit'); } };
+    document.addEventListener('keydown', onKey);
+    const cleanup = () => document.removeEventListener('keydown', onKey);
+    m.el.addEventListener('click', (e) => { if (e.target === m.el || e.target.closest('[data-close]')) cleanup(); });
+    const pad = (label) => `<button class="tap-pad" id="tapPad">${label}<small>or press the space bar</small></button>`;
+    const bindPad = () => $('#tapPad', m.body)?.addEventListener('pointerdown', (e) => { e.preventDefault(); taps.push(IotAudio.wallNow()); flashPad(); });
+    const run = async (kind) => {
+      taps = [];
+      const count = 16, interval = 650;
+      let events;
+      if (kind === 'sound') events = await IotAudio.playClicks(ctx, count, interval, 1500);
+      else {
+        const start = Date.now() + 1800;
+        events = Array.from({ length: count }, (_, i) => start + i * interval);
+        await api('/matrix/calibrate-flash', { body: { times: events, onMs: 180 } });
+      }
+      await new Promise((r) => setTimeout(r, events[events.length - 1] - Date.now() + 900));
+      return IotAudio.tapOffset(events, taps);
+    };
+    const step = (n, title, text, action) => {
+      m.body.innerHTML = `<div class="steps-title">Step ${n} of 3 · ${title}</div><p class="desc" style="margin:0">${text}</p>${pad(action)}<div id="tapMsg"></div>`;
+      bindPad();
+    };
+    m.actions.innerHTML = '<button class="btn" data-close>Cancel</button>';
+
+    // 1. Network
+    m.body.innerHTML = '<div class="steps-title">Step 1 of 3 · Network</div><div class="waiting"><span class="spinner"></span>Measuring each bulb’s network delay…</div>';
+    try {
+      const r = await api('/matrix/calibrate-network', { method: 'POST' });
+      result.network = r;
+      if (!r.medianMs) throw new Error('No bulb answered. Are you on the same network as the bulbs?');
+    } catch (e) {
+      m.body.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+      return cleanup();
+    }
+    // 2. Sound
+    for (;;) {
+      step(2, 'Sound', 'Use the speakers you’ll play music on. You’ll hear 16 clicks — tap along on every click, as if playing a drum.', 'Tap on each click');
+      const r = await run('sound');
+      if (r && r.spreadMs < 90) { result.audio = r; break; }
+      $('#tapMsg', m.body).innerHTML = `<div class="msg warn">${r ? `Taps were too uneven (±${r.spreadMs} ms).` : 'Not enough taps.'} Let’s try that again.</div>`;
+      await new Promise((r2) => setTimeout(r2, 1800));
+    }
+    // 3. Light
+    for (;;) {
+      step(3, 'Light', 'Now look at the bulbs (not the screen). They’ll flash 16 times — tap on every flash.', 'Tap on each flash');
+      const r = await run('light');
+      if (r && r.spreadMs < 110) { result.light = r; break; }
+      $('#tapMsg', m.body).innerHTML = `<div class="msg warn">${r ? `Taps were too uneven (±${r.spreadMs} ms).` : 'Not enough taps — are the bulbs flashing?'} Let’s try again.</div>`;
+      await new Promise((r2) => setTimeout(r2, 1800));
+    }
+    cleanup();
+    try {
+      const saved = await api('/matrix/calibrate-taps', { body: { audioTapMs: result.audio.offsetMs, lightTapMs: result.light.offsetMs, outputLatencyMs: analyzer().outputLatencyMs, taps: result.audio.used + result.light.used } });
+      MX.info = await api('/matrix');
+      m.body.innerHTML = `<div class="msg success">Calibrated. Bulbs need their commands <strong>${saved.lightLatencyMs} ms</strong> early; the slowest bulbs get extra from the network test.</div>
+        <dl class="kv"><dt>Your tap vs sound</dt><dd>${result.audio.offsetMs} ms (±${result.audio.spreadMs})</dd><dt>Your tap vs light</dt><dd>${result.light.offsetMs} ms (±${result.light.spreadMs})</dd><dt>Speaker delay</dt><dd>${analyzer().outputLatencyMs} ms (reported by the browser)</dd><dt>Network</dt><dd>median ${result.network.medianMs} ms round trip</dd></dl>
+        <p class="desc">Saved in <code>layouts/auditorium.json</code>. Redo it if you change speakers (e.g. Bluetooth) or venue.</p>`;
+      m.actions.innerHTML = '<button class="btn primary" data-close>Done</button>';
+      renderPanel();
+    } catch (e) {
+      m.body.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+    }
+  }
+
+  // ---------- show: choreograph a song ----------
+  const SHOW = { list: [], show: null, audioEl: null, url: null, playing: false, raf: 0, dirty: false, busy: '', syncTimer: 0, lastAnchor: 0, editTimer: 0 };
+  const fmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
+  const parseTime = (v) => { const m = String(v).trim().match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/); return m ? (+(m[1] || 0)) * 60 + +m[2] : NaN; };
+  const PALETTE_COLORS = ['#f97316', '#0ea5e9', '#a855f7', '#22c55e', '#eab308', '#ef4444', '#14b8a6', '#ec4899', '#6366f1', '#84cc16'];
+  const colorFor = (id) => PALETTE_COLORS[[...id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % PALETTE_COLORS.length];
+  const SECTION_COLORS = { intro: '#64748b', verse: '#0ea5e9', build: '#f59e0b', drop: '#ef4444', chorus: '#a855f7', breakdown: '#14b8a6', outro: '#64748b' };
+
+  async function loadShowList() {
+    try { SHOW.list = (await api('/shows')).shows; } catch { SHOW.list = []; }
+  }
+
+  function setSongElement(file) {
+    if (SHOW.url) URL.revokeObjectURL(SHOW.url);
+    SHOW.url = URL.createObjectURL(file);
+    SHOW.audioEl = new Audio(SHOW.url);
+    SHOW.audioEl.preload = 'auto';
+    for (const ev of ['seeked', 'pause', 'play', 'ratechange']) SHOW.audioEl.addEventListener(ev, () => syncShow(true));
+    SHOW.audioEl.addEventListener('ended', () => showStop());
+  }
+
+  async function onSongFile(file) {
+    if (!file) return;
+    showPause();
+    // Re-attaching the song to a saved show: no need to analyse again, the map is in the show.
+    if (SHOW.show?.beats?.length && SHOW.show.downbeats) {
+      setSongElement(file);
+      await new Promise((r) => SHOW.audioEl.addEventListener('loadedmetadata', r, { once: true }));
+      if (Math.abs(SHOW.audioEl.duration - SHOW.show.audio.duration) > 1) toast(`This file is ${fmt(SHOW.audioEl.duration)} long but the show was made for ${fmt(SHOW.show.audio.duration)}`, 'Cue times may not line up.', true);
+      renderPanel(); drawTimeline();
+      return;
+    }
+    SHOW.busy = 'Reading the song…';
+    renderPanel();
+    try {
+      setSongElement(file);
+      const a = await IotAudio.analyzeSong(await file.arrayBuffer(), (msg) => { SHOW.busy = msg; const b = $('#showBusy'); if (b) b.textContent = msg; });
+      SHOW.show = {
+        name: file.name.replace(/\.[^.]+$/, ''),
+        layout: 'auditorium',
+        audio: { fileName: file.name, duration: a.duration },
+        bpm: a.bpm, beats: a.beats, downbeats: a.downbeats, kicks: a.kicks, snares: a.snares, hats: a.hats,
+        env: a.env, bands: a.bands, sections: a.sections,
+        offsetMs: 0,
+        cues: IotAudio.autoChoreograph(a),
+      };
+      SHOW.dirty = true;
+      const counts = a.sections.map((s) => IotAudio.PRETTY[s.type] || s.type);
+      toast(`${a.bpm} BPM · ${a.downbeats.length} bars · ${SHOW.show.cues.length} cues`, `Sections: ${counts.join(' → ')}`);
+    } catch (e) {
+      toast("Couldn't read that audio file", e.message, true);
+    }
+    SHOW.busy = '';
+    renderPanel();
+    drawTimeline();
+  }
+
+  async function openShow(id) {
+    showStop();
+    try {
+      SHOW.show = await api('/shows/' + encodeURIComponent(id));
+      SHOW.audioEl = null;
+      SHOW.dirty = false;
+      if (!SHOW.show.downbeats) toast('This show was made with an older version', 'Pick the song and run Auto-choreograph to get bars, drum hits and sections.');
+    } catch (e) { toast(e.message, e.hint, true); }
+    renderPanel();
+    drawTimeline();
+  }
+
+  /** Wall time at which song time 0 is *heard* (speaker delay included). */
+  const anchorNow = () => IotAudio.wallNow() - SHOW.audioEl.currentTime * 1000 + analyzer().outputLatencyMs;
+
+  function syncShow(force) {
+    if (!SHOW.audioEl || !SHOW.show || (!SHOW.playing && !force)) return;
+    const anchor = anchorNow();
+    // currentTime is coarse (~10 ms); only re-send when the anchor really moved.
+    if (!force && Math.abs(anchor - SHOW.lastAnchor) < 12) return;
+    SHOW.lastAnchor = anchor;
+    fetch('/api/show/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anchorMs: Math.round(anchor), playing: SHOW.playing && !SHOW.audioEl.paused }) }).catch(() => {});
+  }
+
+  async function showPlay() {
+    if (!SHOW.audioEl) return toast('Pick the song file first');
+    if (!SHOW.show.downbeats) return toast('Run Auto-choreograph first', 'This show has no bar/drum map yet.');
+    if (AUDIO.source) stopSource();
+    await analyzer().useElement(SHOW.audioEl);
+    attachAnalyzer(false);
+    try { await SHOW.audioEl.play(); } catch (e) { return toast("Couldn't play the song", e.message, true); }
+    SHOW.playing = true;
+    SHOW.lastAnchor = anchorNow();
+    try {
+      MX.info.status = await api('/show/play', { body: { show: SHOW.show, anchorMs: Math.round(SHOW.lastAnchor), options: MX.options } });
+    } catch (e) { toast(e.message, e.hint, true); }
+    clearInterval(SHOW.syncTimer);
+    SHOW.syncTimer = setInterval(() => syncShow(false), 1000);
+    renderPanel();
+    cancelAnimationFrame(SHOW.raf);
+    const loop = () => {
+      if (!SHOW.playing) return;
+      drawTimeline();
+      const time = $('#showTime');
+      if (time) time.textContent = `${fmt(SHOW.audioEl.currentTime)} / ${fmt(SHOW.show.audio.duration)}`;
+      SHOW.raf = requestAnimationFrame(loop);
+    };
+    SHOW.raf = requestAnimationFrame(loop);
+  }
+
+  function showPause() {
+    if (!SHOW.playing) return;
+    SHOW.playing = false;
+    cancelAnimationFrame(SHOW.raf);
+    clearInterval(SHOW.syncTimer);
+    SHOW.audioEl?.pause();
+    fetch('/api/show/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playing: false }) }).catch(() => {});
+    if (MX.mode === 'show') renderPanel();
+  }
+
+  function showStop() {
+    const was = SHOW.playing;
+    showPause();
+    if (SHOW.audioEl) SHOW.audioEl.currentTime = 0;
+    if (was || mxRunning()) api('/show/stop', { method: 'POST' }).then((st) => { MX.info.status = st; updateCells(); }).catch(() => {});
+    if (MX.mode === 'show') renderPanel();
+    drawTimeline();
+  }
+
+  function seek(t) {
+    if (!SHOW.audioEl) return;
+    SHOW.audioEl.currentTime = Math.max(0, Math.min(SHOW.show.audio.duration - 0.05, t));
+    drawTimeline();
+    const time = $('#showTime');
+    if (time) time.textContent = `${fmt(SHOW.audioEl.currentTime)} / ${fmt(SHOW.show.audio.duration)}`;
+  }
+
+  /** Push cue/offset edits to a playing show (debounced). */
+  function pushShowEdit() {
+    SHOW.dirty = true;
+    const b = $('[data-act=show-save]'); if (b) b.textContent = 'Save show';
+    if (!SHOW.playing) return;
+    clearTimeout(SHOW.editTimer);
+    SHOW.editTimer = setTimeout(() => api('/show/edit', { body: { cues: SHOW.show.cues, offsetMs: SHOW.show.offsetMs } }).catch(() => {}), 250);
+  }
+
+  function currentCueIndex() {
+    if (!SHOW.audioEl || !SHOW.show) return -1;
+    const t = SHOW.audioEl.currentTime;
+    let idx = -1;
+    SHOW.show.cues.forEach((c, i) => { if (c.t <= t) idx = i; });
+    return idx;
+  }
+
+  function drawTimeline() {
+    const canvas = $('#timeline');
+    if (!canvas || !SHOW.show) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (canvas.width !== w * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
+    const g = canvas.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    const s = SHOW.show, dur = s.audio.duration;
+    const x = (t) => (t / dur) * w;
+    const css = getComputedStyle(document.documentElement);
+    const muted = css.getPropertyValue('--faint').trim() || '#999';
+    const now = currentCueIndex();
+    // Cue blocks (top band).
+    s.cues.forEach((c, i) => {
+      const x0 = x(c.t), x1 = x(s.cues[i + 1]?.t ?? dur);
+      g.fillStyle = colorFor(c.pattern) + (i === now ? 'ff' : '99');
+      g.fillRect(x0, 0, Math.max(1, x1 - x0 - 1), 22);
+      g.fillStyle = '#fff';
+      g.font = '600 11px system-ui, sans-serif';
+      const name = MX.info.patterns.find((p) => p.id === c.pattern)?.name || c.pattern;
+      if (x1 - x0 > 40) g.fillText(name, x0 + 4, 15, x1 - x0 - 8);
+    });
+    // Loudness envelope.
+    const env = s.env || [];
+    if (env.length) {
+      g.fillStyle = css.getPropertyValue('--accent').trim() + '55';
+      g.beginPath();
+      g.moveTo(0, h - 14);
+      for (let px = 0; px <= w; px++) g.lineTo(px, h - 14 - ((env[Math.min(env.length - 1, Math.floor((px / w) * env.length))] || 0) / 99) * (h - 44));
+      g.lineTo(w, h - 14);
+      g.fill();
+    }
+    // Bar lines (every 4 bars stronger).
+    g.fillStyle = muted + '88';
+    (s.downbeats || []).forEach((bi, k) => { const t = s.beats[bi]; if (t !== undefined) g.fillRect(x(t), 26, 1, k % 4 === 0 ? 8 : 3); });
+    // Sections (bottom band).
+    (s.sections || []).forEach((sec) => {
+      g.fillStyle = SECTION_COLORS[sec.type] || '#888';
+      g.fillRect(x(sec.start), h - 12, Math.max(1, x(sec.end) - x(sec.start) - 1), 12);
+      g.fillStyle = '#fff';
+      g.font = '600 9.5px system-ui, sans-serif';
+      if (x(sec.end) - x(sec.start) > 36) g.fillText((IotAudio.PRETTY[sec.type] || sec.type).toUpperCase(), x(sec.start) + 3, h - 3, x(sec.end) - x(sec.start) - 6);
+    });
+    if (!SHOW.audioEl) {
+      g.fillStyle = muted;
+      g.font = '12px system-ui, sans-serif';
+      g.fillText('Pick the song file to play this show', 8, h / 2 + 6);
+    } else {
+      g.fillStyle = css.getPropertyValue('--text').trim();
+      g.fillRect(x(SHOW.audioEl.currentTime), 0, 2, h);
+    }
+    if (SHOW.playing) document.querySelectorAll('.cue').forEach((el) => el.classList.toggle('now', +el.dataset.i === now));
+  }
+
+  function showPanel() {
+    const s = SHOW.show;
+    const pats = MX.info.patterns.filter((p) => p.id !== 'draw');
+    const head = `<div><h4>Show</h4>
+      <div class="row2"><select class="field" data-show="open"><option value="">${s?.id ? 'Open another show…' : 'Open a saved show…'}</option>${SHOW.list.map((x) => `<option value="${esc(x.id)}" ${x.id === s?.id ? 'selected' : ''}>${esc(x.name)} (${x.cues} cues)</option>`).join('')}</select>
+      <button class="btn small" data-act="show-new">New show</button></div></div>`;
+    if (SHOW.busy) return head + `<div class="waiting"><span class="spinner"></span><span id="showBusy">${esc(SHOW.busy)}</span></div>`;
+    if (!s) {
+      return head + `<div class="callout"><div><strong>Pick a song</strong>. I’ll find its tempo, bars, drum hits and sections (intro, build-up, drop…) and choreograph it; then change anything you like.</div>
+        <input type="file" accept="audio/*" data-show="file" /></div>
+        <p class="desc">The song stays on your computer; the show (cues + song map) is saved to <code>shows/</code> in the repo.</p>${syncHtml()}`;
+    }
+    const needFile = !SHOW.audioEl;
+    const st = MX.info.status;
+    const bars = s.downbeats?.length ?? 0;
+    const sections = (s.sections || []).map((x) => `<span class="chip-s" style="background:${SECTION_COLORS[x.type] || '#888'}">${esc(IotAudio.PRETTY[x.type] || x.type)}</span>`).join('');
+    const PALS = [['dual', 'W+C'], ['cool', 'Cool'], ['warm', 'Warm'], ['neutral', 'Neut.']];
+    return head + `
+      <div><label class="f">Name<input class="field" data-show="name" value="${esc(s.name)}" maxlength="60"/></label>
+        <p class="desc" style="margin:6px 0 0">🎵 ${esc(s.audio.fileName)} · ${fmt(s.audio.duration)}${s.bpm ? ` · ${s.bpm} BPM` : ''} · ${bars} bars</p>
+        ${sections ? `<div class="btnrow" style="margin-top:6px">${sections}</div>` : ''}</div>
+      ${needFile ? `<div class="callout"><div><strong>Pick the song file</strong> (${esc(s.audio.fileName)}) to play or edit this show.</div><input type="file" accept="audio/*" data-show="file" /></div>` : ''}
+      <div><h4>Play</h4>
+        <div class="transport">
+          ${SHOW.playing ? '<button class="btn" data-act="show-pause">❚❚ Pause</button>' : `<button class="btn primary" data-act="show-play" ${needFile ? 'disabled' : ''}>▶ Play show</button>`}
+          <button class="btn small" data-act="show-stop" ${needFile ? 'disabled' : ''}>■</button>
+          <span class="time" id="showTime">${fmt(SHOW.audioEl?.currentTime || 0)} / ${fmt(s.audio.duration)}</span>
+        </div>
+        ${SHOW.playing && st?.section ? `<div class="desc" style="margin-top:6px">Now: <strong>${esc(IotAudio.PRETTY[st.section] || st.section)}</strong> · bar ${st.bar + 1}.${st.beatInBar + 1}</div>` : ''}
+        <label class="slider-row" style="margin-top:10px" title="Fine-tune on top of calibration">Fine offset<input type="range" min="-300" max="300" step="10" value="${s.offsetMs || 0}" data-show="offset"/><output>${(s.offsetMs || 0) > 0 ? '+' : ''}${s.offsetMs || 0} ms</output></label>
+        <p class="desc" style="margin:4px 0 0">Lights early? Move right. Late? Move left. Playback is timed by the server, so the tab can be in the background.</p>
+      </div>
+      <div><h4>Cues (${s.cues.length})</h4>
+        <div class="btnrow" style="margin-bottom:8px">
+          <button class="btn small" data-act="cue-add" ${needFile ? 'disabled' : ''}>+ Cue at playhead</button>
+          <button class="btn small" data-act="auto" ${s.beats?.length ? '' : 'disabled'}>Auto-choreograph</button>
+        </div>
+        <div class="cues">${s.cues.map((c, i) => `
+          <div class="cue" data-i="${i}">
+            <input class="field" value="${fmt(c.t)}" data-cue="t" title="Start time (m:ss.s). Click the timeline to jump." />
+            <select class="field" data-cue="pattern">${pats.map((p) => `<option value="${p.id}" ${p.id === c.pattern ? 'selected' : ''}>${esc(p.name)}${p.category === 'music' ? ' ♫' : ''}</option>`).join('')}</select>
+            <select class="field" data-cue="palette" title="White: warm+cool (the look decides), cool, warm or neutral">${PALS.map(([v, l]) => `<option value="${v}" ${(c.palette || 'dual') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+            <label title="Advance a basic pattern on each beat"><input type="checkbox" data-cue="beat" ${c.stepOn === 'beat' ? 'checked' : ''} ${isMusicPattern(c.pattern) ? 'disabled' : ''}/>beat</label>
+            <button class="x" data-act="cue-del" title="Delete cue">×</button>
+          </div>`).join('')}</div>
+        <p class="desc" style="margin:6px 0 0">♫ follows beats, bars and drum hits · “beat” steps a basic pattern on each beat.</p>
+      </div>
+      <div class="btnrow"><button class="btn primary" data-act="show-save">${SHOW.dirty ? 'Save show' : 'Saved'}</button>${s.id ? '<button class="btn small danger" data-act="show-delete">Delete</button>' : ''}</div>
+      ${optionsHtml(true)}
+      ${syncHtml()}`;
+  }
+
+  async function onShowAct(act, t) {
+    const s = SHOW.show;
+    if (act === 'show-new') { showStop(); SHOW.show = null; SHOW.audioEl = null; renderPanel(); drawTimeline(); return true; }
+    if (act === 'show-play') { await showPlay(); return true; }
+    if (act === 'show-pause') { showPause(); return true; }
+    if (act === 'show-stop') { showStop(); return true; }
+    if (act === 'auto') {
+      if (s.cues.length && !confirm('Replace all cues with an automatic choreography?')) return true;
+      s.cues = IotAudio.autoChoreograph({ ...s, duration: s.audio.duration });
+      pushShowEdit(); renderPanel(); drawTimeline(); return true;
+    }
+    if (act === 'cue-add') {
+      const now = SHOW.audioEl?.currentTime || 0;
+      // Snap to the nearest bar line.
+      const bars = (s.downbeats || []).map((i) => s.beats[i]);
+      const snapped = bars.length ? bars.reduce((a, b) => (Math.abs(b - now) < Math.abs(a - now) ? b : a), bars[0]) : now;
+      s.cues = [...s.cues, { t: Math.round(snapped * 100) / 100, pattern: 'kick-snare', palette: 'dual', stepOn: 'timer' }].sort((a, b) => a.t - b.t);
+      pushShowEdit(); renderPanel(); drawTimeline(); return true;
+    }
+    if (act === 'cue-del') {
+      s.cues.splice(+t.closest('.cue').dataset.i, 1);
+      pushShowEdit(); renderPanel(); drawTimeline(); return true;
+    }
+    if (act === 'show-save') {
+      try {
+        const saved = await api('/shows/' + encodeURIComponent(s.id || s.name), { method: 'PUT', body: s });
+        SHOW.show = saved; SHOW.dirty = false;
+        await loadShowList();
+        toast(`Saved to shows/${saved.id}.json`);
+      } catch (e) { toast(e.message, e.hint, true); }
+      renderPanel(); return true;
+    }
+    if (act === 'show-delete') {
+      if (!confirm(`Delete the show "${s.name}"?`)) return true;
+      await api('/shows/' + encodeURIComponent(s.id), { method: 'DELETE' }).catch(() => {});
+      showStop(); SHOW.show = null; SHOW.audioEl = null;
+      await loadShowList(); renderPanel(); drawTimeline(); return true;
+    }
+    return false;
+  }
+
+  // Read-only handle for debugging from the browser console.
+  window.iotDebug = { S, MX, AUDIO, SHOW };
+
   (async () => {
     await loadDevices().catch((e) => toast('Cannot reach the iot-hub server', 'Is `iot ui` still running?', true));
     loadGuide();
+    let view = 'devices';
+    try { view = localStorage.getItem('iot-hub:view') || 'devices'; } catch {}
+    if (view === 'matrix') showView('matrix');
     if (!S.devices.length) scan();
     else refreshStates();
     api('/effect').then(setClub).catch(() => {});
@@ -800,7 +1901,7 @@
       if (document.visibilityState !== 'visible' || S.scanning) return;
       api('/effect').then(setClub).catch(() => {});
       // While the club effect runs, states change every half second; polling just adds traffic.
-      if (!club.running) refreshStates();
+      if (!club.running && !mxRunning()) refreshStates();
     }, 5000);
     // Pick up devices found by the server's background rescan.
     setInterval(async () => {

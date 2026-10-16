@@ -4,6 +4,13 @@ import path from 'path';
 import crypto from 'crypto';
 import { exec } from 'child_process';
 import { EffectRunner } from '../core/effects';
+import { assign, assignedIds, createLayout, numberGrid, validateLayout } from '../core/matrix';
+import { latencyFor, lightLatencyFromTaps, measureNetwork } from '../core/calibration';
+import { Autopilot, showDirector } from '../core/directors';
+import { MatrixRunner, normaliseOptions } from '../core/matrix-runner';
+import { LiveClock, Metronome, ShowClock } from '../core/music';
+import { PATTERNS } from '../core/patterns';
+import { deleteShow, getShow, listShows, saveShow, Show, songMapOf, validateShow } from '../core/shows';
 import { Hub } from '../core/hub';
 import { Command, Device, DeviceError, SetupIO } from '../core/types';
 import { parseColor } from '../util/color';
@@ -134,6 +141,47 @@ export function startServer(opts: { port: number; open: boolean; hub?: Hub }) {
   const hub = opts.hub ?? new Hub();
   const sessions = new Map<string, SetupSession>();
   const effects = new EffectRunner(hub);
+  const matrix = new MatrixRunner(hub, () => hub.store.layout(), () => latencyFor(hub.store.layout()));
+  // Music sources: live sound from the browser, or a show being played.
+  const live = new LiveClock();
+  let autopilot: Autopilot | undefined;
+  let show: { data: Show; clock: ShowClock; options: ReturnType<typeof normaliseOptions> } | undefined;
+  const useMetronome = () => {
+    show = undefined;
+    autopilot = undefined;
+    matrix.setSource(new Metronome());
+  };
+  /** Only one thing drives the lights at a time. */
+  const stopAllEffects = async () => {
+    const wasRunning = effects.getStatus().running;
+    effects.stop();
+    matrix.stop();
+    useMetronome();
+    await matrix.stopIdentify();
+    if (wasRunning) await effects.drain();
+  };
+  const matrixStatus = () => ({
+    ...matrix.status(),
+    autopilot: autopilot?.snapshot(),
+    show: show ? { id: show.data.id, playing: show.clock.playing, songTime: Math.max(0, show.clock.songTime(Date.now())) } : undefined,
+    liveLocked: live.isLocked,
+  });
+  const matrixInfo = () => {
+    const layout = hub.store.layout();
+    const used = layout ? assignedIds(layout) : new Set<string>();
+    return {
+      layout: layout ?? null,
+      numbers: layout ? numberGrid(layout) : [],
+      lights: hub
+        .devices()
+        .filter((d) => d.status === 'ready' && d.kind === 'light')
+        .map((d) => ({ id: d.id, name: d.name, address: d.address, assigned: used.has(d.id), capabilities: d.capabilities })),
+      patterns: PATTERNS.map(({ id, name, description, params, category }) => ({ id, name, description, params: params ?? [], category: category ?? 'basic' })),
+      status: matrixStatus(),
+      calibration: layout?.calibration ?? null,
+      latency: latencyFor(layout),
+    };
+  };
   const devicesByIds = (ids: unknown) =>
     Array.isArray(ids) ? hub.devices().filter((d) => ids.includes(d.id)) : hub.devices();
 
@@ -165,6 +213,10 @@ export function startServer(opts: { port: number; open: boolean; hub?: Hub }) {
     const method = req.method ?? 'GET';
 
     try {
+      if (method === 'GET' && url.pathname === '/audio.js') {
+        res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(fs.readFileSync(path.join(__dirname, 'audio.js')));
+      }
       if (method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(fs.readFileSync(page));
@@ -208,6 +260,8 @@ export function startServer(opts: { port: number; open: boolean; hub?: Hub }) {
         if (method === 'POST') {
           const { effect, ids } = await readBody(req);
           if (effect !== 'club') throw new DeviceError(`Unknown effect "${effect}"`);
+          matrix.stop();
+          await matrix.stopIdentify();
           const status = effects.start('club', devicesByIds(ids));
           if (!status.running) throw new DeviceError('No controllable lights to run the effect on');
           return json(res, 200, status);
@@ -218,13 +272,209 @@ export function startServer(opts: { port: number; open: boolean; hub?: Hub }) {
       if (resource === 'group' && method === 'POST') {
         const body = await readBody(req);
         const command = toCommand(body.command);
-        const wasRunning = effects.getStatus().running;
-        effects.stop();
-        if (wasRunning) await effects.drain();
+        await stopAllEffects();
         const targets = devicesByIds(body.ids).filter((d) => d.status === 'ready');
         const results = await Promise.allSettled(targets.map((d) => hub.run(d, command)));
         const failed = results.flatMap((r, i) => (r.status === 'rejected' ? [{ id: targets[i].id, name: targets[i].name, error: r.reason?.message }] : []));
         return json(res, 200, { ok: targets.length - failed.length, failed });
+      }
+
+      if (resource === 'matrix') {
+        const body = method === 'GET' ? {} : await readBody(req);
+        const layout = hub.store.layout();
+        const need = () => {
+          if (!layout) throw new DeviceError('Create the matrix first');
+          return layout;
+        };
+        switch (`${method} ${id ?? ''}`) {
+          case 'GET ':
+            return json(res, 200, matrixInfo());
+          case 'GET status':
+            return json(res, 200, matrixStatus());
+          case 'POST source':
+            // 'live' while the Audio tab listens; 'metronome' otherwise (keeps music patterns moving at 120 BPM).
+            if (body.kind === 'live') {
+              show = undefined;
+              matrix.setSource(live);
+            } else useMetronome();
+            return json(res, 200, matrixStatus());
+          case 'POST autopilot': {
+            need();
+            effects.stop();
+            if (!body.on) {
+              autopilot = undefined;
+              matrix.stop();
+              return json(res, 200, matrixStatus());
+            }
+            show = undefined;
+            matrix.setSource(live);
+            autopilot = new Autopilot();
+            matrix.direct('autopilot', autopilot.director, body.options ?? {});
+            return json(res, 200, matrixStatus());
+          }
+          case 'GET calibration':
+            return json(res, 200, { calibration: layout?.calibration ?? null, latency: latencyFor(layout) });
+          case 'POST calibrate-network': {
+            const l = need();
+            await stopAllEffects();
+            const result = await measureNetwork(hub, l);
+            const fresh = hub.store.layout()!;
+            hub.store.saveLayout({ ...fresh, calibration: { ...fresh.calibration, bulbs: result.bulbs, networkMeasuredAt: new Date().toISOString() } });
+            return json(res, 200, { ...result, latency: latencyFor(hub.store.layout()) });
+          }
+          case 'POST calibrate-flash':
+            need();
+            effects.stop();
+            useMetronome();
+            return json(res, 200, matrix.flashAt((Array.isArray(body.times) ? body.times : []).map(Number).filter((t: number) => t > Date.now() - 1000).slice(0, 40), Number(body.onMs) || 160));
+          case 'POST calibrate-taps': {
+            const l = need();
+            const audioTapMs = Number(body.audioTapMs), lightTapMs = Number(body.lightTapMs), outputLatencyMs = Math.max(0, Number(body.outputLatencyMs) || 0);
+            if (!Number.isFinite(audioTapMs) || !Number.isFinite(lightTapMs)) throw new DeviceError('Tap results are missing');
+            const lightLatencyMs = lightLatencyFromTaps(audioTapMs, lightTapMs, outputLatencyMs);
+            hub.store.saveLayout({
+              ...l,
+              calibration: {
+                ...l.calibration,
+                lightLatencyMs,
+                lightSource: 'tap',
+                lightMeasuredAt: new Date().toISOString(),
+                tap: { audioTapMs: Math.round(audioTapMs), lightTapMs: Math.round(lightTapMs), outputLatencyMs: Math.round(outputLatencyMs), taps: Number(body.taps) || 0 },
+              },
+            });
+            return json(res, 200, { lightLatencyMs, latency: latencyFor(hub.store.layout()) });
+          }
+          case 'POST create': {
+            const rows = Number(body.rows) || 9, cols = Number(body.cols) || 6;
+            hub.store.saveLayout(validateLayout({ ...createLayout(rows, cols), cells: layout?.cells, numbering: layout?.numbering }));
+            return json(res, 200, matrixInfo());
+          }
+          case 'PUT ':
+            hub.store.saveLayout(validateLayout({ ...need(), ...body, cells: body.cells ?? need().cells }));
+            return json(res, 200, matrixInfo());
+          case 'POST assign': {
+            const l = need();
+            const row = Number(body.row), col = Number(body.col);
+            if (!(row >= 0 && row < l.rows && col >= 0 && col < l.cols)) throw new DeviceError('That cell is outside the grid');
+            if (body.id && !hub.devices().some((d) => d.id === body.id)) throw new DeviceError('Unknown bulb');
+            hub.store.saveLayout(assign(l, row, col, body.id || null));
+            return json(res, 200, matrixInfo());
+          }
+          case 'POST clear-map':
+            hub.store.saveLayout({ ...need(), cells: need().cells.map((r) => r.map(() => null)) });
+            return json(res, 200, matrixInfo());
+          case 'POST identify': {
+            const d = hub.devices().find((x) => x.id === body.id);
+            if (!d) throw new DeviceError('Unknown bulb');
+            effects.stop();
+            return json(res, 200, matrix.identify(d));
+          }
+          case 'POST identify-stop':
+            await matrix.stopIdentify(['off', 'dim', 'on'].includes(body.after) ? body.after : undefined);
+            return json(res, 200, matrix.status());
+          case 'POST prepare-mapping': {
+            // Mapped bulbs dim warm, unmapped off: the room shows progress and the flashing bulb stands out.
+            await stopAllEffects();
+            const used = assignedIds(need());
+            const lights = hub.devices().filter((d) => d.status === 'ready' && d.kind === 'light');
+            const results = await Promise.allSettled(
+              lights.map((d) => hub.run(d, used.has(d.id) ? { type: 'set', on: true, brightness: 20, kelvin: 2700 } : { type: 'set', on: false }))
+            );
+            return json(res, 200, { ok: results.filter((r) => r.status === 'fulfilled').length, failed: results.filter((r) => r.status === 'rejected').length });
+          }
+          case 'POST play':
+            need();
+            effects.stop();
+            autopilot = undefined;
+            await matrix.stopIdentify();
+            return json(res, 200, { ...matrix.start(String(body.pattern), body.params ?? {}, body.options ?? {}), autopilot: undefined });
+          case 'POST update':
+            if (show && body.options) show.options = normaliseOptions(body.options, show.options);
+            matrix.update(body.params, body.options);
+            return json(res, 200, matrixStatus());
+          case 'POST stop':
+            matrix.stop();
+            autopilot = undefined;
+            if (show) show.clock.playing = false;
+            return json(res, 200, matrixStatus());
+          case 'POST pixel':
+            matrix.setPixel(Number(body.row), Number(body.col), Number(body.value));
+            return json(res, 200, matrix.status());
+          case 'POST clear-canvas':
+            matrix.clearCanvas();
+            return json(res, 200, matrix.status());
+        }
+      }
+
+      // Live sound features from the browser (mic or a playing file). Sent ~10x/s; beats immediately.
+      // Live sound from the browser: levels/bands ~10x/s, plus the beat tracker's
+      // tempo grid when locked and drum hits (kick/snare/hat) as they're heard.
+      if (resource === 'audio' && method === 'POST') {
+        const body = await readBody(req);
+        if (Array.isArray(body.bands)) live.setFeatures(Math.max(0, Math.min(1, Number(body.level) || 0)), body.bands.slice(0, 6).map((v: unknown) => Math.max(0, Math.min(1, Number(v) || 0))));
+        if (body.grid !== undefined) live.setGrid(body.grid);
+        if (Array.isArray(body.hits)) live.push(body.hits.filter((h: any) => ['beat', 'downbeat', 'kick', 'snare', 'hat'].includes(h?.type)).map((h: any) => ({ at: Number(h.at), type: h.type, strength: Number(h.strength) || 0.7 })));
+        res.writeHead(204).end();
+        return;
+      }
+
+      // Show playback runs here, on the server clock: the browser only reports
+      // where the song is (anchorMs = wall time at which song time 0 is heard).
+      if (resource === 'show') {
+        const body = method === 'POST' ? await readBody(req) : {};
+        if (method === 'POST' && id === 'play') {
+          const data = validateShow(body.show);
+          effects.stop();
+          autopilot = undefined;
+          await matrix.stopIdentify();
+          const clock = new ShowClock(songMapOf(data));
+          clock.anchorMs = Number(body.anchorMs) + data.offsetMs;
+          clock.playing = true;
+          const options = normaliseOptions(body.options ?? {});
+          show = { data, clock, options };
+          matrix.setSource(clock);
+          matrix.direct('show', showDirector(clock, () => show?.data.cues ?? [], () => show?.options ?? options), options);
+          return json(res, 200, matrixStatus());
+        }
+        if (method === 'POST' && id === 'sync') {
+          if (show) {
+            if (body.anchorMs !== undefined) show.clock.anchorMs = Number(body.anchorMs) + show.data.offsetMs;
+            if (body.playing !== undefined) show.clock.playing = !!body.playing;
+          }
+          return json(res, 200, matrixStatus());
+        }
+        if (method === 'POST' && id === 'edit') {
+          // Live edits while playing: new cues / offset take effect on the next frame.
+          if (show) {
+            const merged = validateShow({ ...show.data, ...body, id: show.data.id });
+            const anchorBase = show.clock.anchorMs - show.data.offsetMs;
+            show.data = merged;
+            show.clock.anchorMs = anchorBase + merged.offsetMs;
+          }
+          return json(res, 200, matrixStatus());
+        }
+        if (method === 'POST' && id === 'stop') {
+          matrix.stop();
+          useMetronome();
+          return json(res, 200, matrixStatus());
+        }
+      }
+
+      if (resource === 'shows') {
+        if (method === 'GET' && !id) return json(res, 200, { shows: listShows() });
+        if (method === 'GET' && id) {
+          const show = getShow(id);
+          return show ? json(res, 200, show) : json(res, 404, { error: 'Show not found' });
+        }
+        if (method === 'PUT') {
+          const body = await readBody(req);
+          const show = validateShow({ ...body, id: id ?? body.id });
+          return json(res, 200, saveShow(show));
+        }
+        if (method === 'DELETE' && id) {
+          deleteShow(id);
+          return json(res, 200, { ok: true });
+        }
       }
 
       if (resource === 'drivers' && method === 'GET') {

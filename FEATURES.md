@@ -68,7 +68,35 @@ Measured on an office network with 28 WiZ bulbs: most had 0% loss, but bulbs at 
 | ☐ | Step-by-step pairing in the browser | `SetupIO` interface, `web/server.ts` (SSE) | Drivers write setup once against an interface (steps, questions, secret input, countdowns), and both the CLI and the web UI render it. |
 | ☐ | Per-brand troubleshooting tips | each driver's `troubleshooting`, **Troubleshooting** section | E.g. guest Wi-Fi and "AP isolation" block discovery; WiZ "Allow local communication"; close the Smart Life app for Tuya. |
 
-## 6. Architecture choices worth comparing
+## 6. Light matrix (bulbs as an LED grid)
+
+| ✔ | Feature | Where | The non-obvious part |
+|---|---|---|---|
+| ☐ | Map bulbs to grid cells | Matrix tab → **Map bulbs**, `core/matrix.ts` | Nothing on the network says where a bulb hangs. The wizard flashes one unplaced bulb at a time (others off, placed ones dim) and you click its cell. Includes skip and undo. |
+| ☐ | Numbering | `sequence()` in `core/matrix.ts` | Derived, not stored: start corner, rows or columns, zigzag, and end-to-start. Changing it renumbers instantly. |
+| ☐ | Layout saved in the repo | `layouts/auditorium.json` ([format](layouts/README.md)) | Versioned record of which bulb (by MAC) is where, with a ready-made `bulbs` list for other tools. Credentials stay out of the repo. |
+| ☐ | 13 patterns + draw | `core/patterns.ts` | Sequence chase/fill (start→end or end→start), row/column sweep, rain, ripple, checkerboard, equaliser, sparkle, spiral, scrolling text (5×7 font), Game of Life, all on; plus live drawing. Patterns are pure functions of tick → frame, so they're easy to add and test. |
+| ☐ | Preview mode | **Send to real bulbs** off (default) | Patterns play on screen only, so you can test without lighting up the room. |
+| ☐ | Bulb-friendly rendering | `core/matrix-runner.ts` | Brightness quantised to 10 % steps, send only on change, re-send every 4 s to repair lost packets, skip bulbs with a command in flight, auto-stop after 1 hour. |
+
+### Sound, sync and shows
+
+| ✔ | Feature | Where | The non-obvious part |
+|---|---|---|---|
+| ☐ | **Per-bulb send-ahead timing** | `core/matrix-runner.ts` | Frames are rendered 25×/s for a moment slightly in the future; each bulb is sent its change early by *its own* delay, so fast and slow bulbs change together. A frame containing a hit is timed to the hit, not the frame edge. Measured: 3 bulbs with 20–220 ms links all land within ±2 ms of the downbeat. |
+| ☐ | Fire-and-forget streaming | `Driver.stream`, WiZ shared socket | No acks/retries in real time (a slow bulb can't stall the rest); only changes are sent, unchanged state is re-sent every 1.5 s to repair lost packets. |
+| ☐ | Auto-calibration | `core/calibration.ts`, Sync card | Network delay per bulb (automatic pings). **Tap test**: tap to clicks you hear, then to flashes you see — your tap habit cancels out, leaving light-vs-sound delay incl. speakers/Bluetooth. Saved in `layouts/auditorium.json`. |
+| ☐ | One music clock, three sources | `core/music.ts` | Metronome (120 BPM preview), Live (browser beat grid + drum hits) and Show (analysed song + anchor). Patterns see beat position, bar, kick/snare/hat hits, energy. |
+| ☐ | Live beat lock | `web/audio.js` `BeatTracker` | Kick/snare/hat onset detection; tempo from inter-onset intervals; phase-locked loop; downbeat; **16-step groove model** so repeating hits are predicted ~0.6 s ahead and land on time. Tested 95/128/140/174 BPM: locks in 4.5–7 s, predictions within ~5 ms (median). |
+| ☐ | Microphone or system sound | Audio tab | Mic (device picker, raw signal) or tab/screen sound via screen share; desktop apps on macOS need a loopback device (e.g. BlackHole). |
+| ☐ | **Autopilot (DJ mode)** | `core/directors.ts` | Changes looks on 8-bar phrases by energy (relative to the room), rides build-ups with a riser, hits a blinder on the drop, cools down. |
+| ☐ | 17 music looks, warm/cool as 2nd colour | `core/patterns.ts` (`category: 'music'`) | Blinder, Kick & snare, Hi-hat rain, Tempo wave, Bar scanner, Diagonal sweep, Mirror spectrum, Riser, Breathe, Quadrants, Strobe, Bass pulse, Kick burst, Hat sparkle, Bar climb, Spectrum, Level meter. |
+| ☐ | Song analysis | `analyzeSong()` | One 9-channel filter render (kick/snare/hat + 6 bands); DP beat tracker + steady-grid fit; downbeats; drum hit maps; sections (intro/verse/build/drop/breakdown/outro). Test track: exact tempo, 256/256 beats ≤ 11 ms, 64/64 bars, every section boundary to the second. |
+| ☐ | Section-aware choreography | `autoChoreograph()` | Riser across build-ups, blinder on the drop's first bar, new look every 8 bars, calm intros/breakdowns, fade-out. |
+| ☐ | Show playback on the server | `ShowClock` + `/api/show/*` | The browser only reports where the song is (and its speaker delay); timing is exact and independent of the tab. Shows (cues + song map) saved in `shows/` ([format](shows/README.md)). |
+| ☐ | Preview first | **Send to real bulbs** off by default | Everything plays on the on-screen grid first. |
+
+## 7. Architecture choices worth comparing
 
 - **Generic device model** (`core/types.ts`): every device has a `kind` and a list of `capabilities`. The UI only shows controls a device supports, and the hub refuses commands it can't do. Adding a brand means adding one driver file; adding locks or sensors means adding capabilities.
 - **The browser can't talk to bulbs directly** (no UDP), so a small local server does it. It binds to `127.0.0.1` only, and device keys and tokens are stripped from API responses.

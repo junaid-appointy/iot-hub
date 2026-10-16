@@ -150,6 +150,11 @@ export interface Driver {
   execute(device: Device, command: Command, ctx: DriverContext): Promise<void>;
   /** True if `execute` handles { type: 'set' } in one round trip; otherwise the hub splits it. */
   nativeSet?: boolean;
+  /**
+   * Fire-and-forget send for real-time effects: no ack, no retry, returns
+   * immediately. Lost packets are repaired by the caller re-sending state.
+   */
+  stream?(device: Device, command: Extract<Command, { type: 'set' }>): void;
 }
 
 /** A host seen on the network that no driver claimed. */

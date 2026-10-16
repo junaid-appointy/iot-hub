@@ -283,6 +283,42 @@ export class Hub {
     if (set.kelvin !== undefined) await driver.execute(device, { type: 'color_temp', kelvin: set.kelvin }, ctx);
   }
 
+  /**
+   * Real-time send for effects: fire-and-forget through the driver's stream()
+   * when it has one, otherwise a single fast attempt in the background.
+   */
+  stream(device: Device, command: Extract<Command, { type: 'set' }>): void {
+    if (device.status !== 'ready') return;
+    const driver = this.drivers.find((d) => d.id === device.driver);
+    if (!driver) return;
+    const has = (c: Capability) => device.capabilities.includes(c);
+    const set = {
+      ...command,
+      brightness: has('brightness') ? command.brightness : undefined,
+      kelvin: has('color_temp') && !(has('color') && command.rgb) ? command.kelvin : undefined,
+      rgb: has('color') ? command.rgb : undefined,
+    };
+    if (driver.stream) {
+      try {
+        driver.stream(device, set);
+      } catch {}
+      return;
+    }
+    this.run(device, set, { fast: true }).catch(() => {});
+  }
+
+  /** One status round trip, in ms (no retries). Used to calibrate per-bulb delay. */
+  async ping(device: Device): Promise<number | null> {
+    const driver = this.driver(device.driver);
+    const t0 = performance.now();
+    try {
+      await withTimeout(driver.getState(device, this.context(driver.id, true)), 1500, 'timeout');
+      return performance.now() - t0;
+    } catch {
+      return null;
+    }
+  }
+
   rename(device: Device, name: string) {
     Object.assign(this.store.devices.find((d) => d.id === device.id)!, { name, nameSource: 'user' });
     this.store.save();
