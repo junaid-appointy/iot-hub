@@ -2,6 +2,8 @@
 
 Discover and control smart devices on your local network, regardless of brand or protocol.
 
+Learning how sound maps to light? Open **[docs/seeing-sound.html](docs/seeing-sound.html)** in a browser: an interactive lab for every property of sound and how it can play on the 9×6 bulb wall.
+
 Comparing against your own dashboard? See **[FEATURES.md](FEATURES.md)**: a checklist of every feature, where it lives, and the gotchas behind it.
 
 ```bash
