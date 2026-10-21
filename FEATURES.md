@@ -107,6 +107,18 @@ Measured on an office network with 28 WiZ bulbs: most had 0% loss, but bulbs at 
 | ☐ | **Full mix** layer compositor | `core/patterns.ts` `mix` | Background wash (energy → brightness, centroid → warm/cool, stereo width → spread), bass column, kick floor, snare ceiling, hi-hat glints (more when noisy), melody point (pitch = height, mid-band pan = column) with a trail, blinder on drops. Every layer can be switched off to study one part alone. Used by the Autopilot. |
 | ☐ | Regression tests | `npm test` | Numbering, all patterns, Full mix layers, sync timing (±5 ms), live beat prediction, autopilot arc, and a guard that tests never touch the real layout. |
 
+### Physics looks, ambient glow and delivery
+
+| ✔ | Feature | Where | The non-obvious part |
+|---|---|---|---|
+| ☐ | **Ripple Tank** | `core/patterns.ts` `ripple-tank` | Real 2D wave equation on a 3× finer grid, averaged down per bulb so waves look round. Kicks/snares/hats are drops, bass and melody are continuous drivers; reflecting edges make interference. Net offset removed every step (a real surface settles flat), otherwise the wall slowly fills up. Test: a single kick reaches the floor at 0.36 s and the ceiling at 0.80 s. |
+| ☐ | **Chladni Plate** | `chladni` | Standing-wave modes of a plate, cos(nπx)cos(mπy) − cos(mπx)cos(nπy); the strongest of the 12 notes picks the mode (held 0.4 s to avoid flicker), modes crossfade over 0.9 s, the beat swells it, antinode sign = warm/cool. |
+| ☐ | **Light Harp** | `harp` | Six columns = six strings, one per band, each in its own harmonic shape (1st, 2nd, 3rd); drums pluck them. |
+| ☐ | **Aurora** | `aurora` | Slowly drifting interference of sine fields; energy = brightness, bands light their region, centroid tints, beats send a wave up. |
+| ☐ | **Embers** | `embers` | Particles with gravity, drag and cooling (white-hot → amber), splatted onto the 4 nearest bulbs; bass feeds the fire bed. |
+| ☐ | **Ambient glow + afterglow** | runner options `ambient`, `glow` | Every bulb keeps a floor (default 10 %), so the wall never has dead bulbs; light rises instantly and fades with a time constant (default 0.15 s), which also crossfades between looks. Applied before the preview, so the screen shows what the bulbs get. |
+| ☐ | **Starvation-free delivery** | `matrix-runner.ts` `dispatch/schedule` | One pending command per bulb: newer frames replace its *content* but keep its *time slot* (re-scheduling on every frame would postpone it forever with a constantly moving look). Beat/drum frames are protected from being overwritten and may skip the rate limit (but never < 30 ms apart). Test: ~10 commands/s per bulb, hits land within ±2 ms. |
+
 ## 7. Architecture choices worth comparing
 
 - **Generic device model** (`core/types.ts`): every device has a `kind` and a list of `capabilities`. The UI only shows controls a device supports, and the hub refuses commands it can't do. Adding a brand means adding one driver file; adding locks or sensors means adding capabilities.

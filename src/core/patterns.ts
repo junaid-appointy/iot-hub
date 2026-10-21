@@ -323,6 +323,228 @@ export const PATTERNS: Pattern[] = [
   // ---- music: locked to beats, bars and drum hits ------------------------------
   // These read ctx.music (beat position, bar, kick/snare/hat hits, energy). Without
   // music they run on a 120 BPM metronome, so they can be previewed anywhere.
+  // ---- physics: real sound physics, drawn softly on every bulb -------------------
+  {
+    id: 'ripple-tank',
+    name: 'Ripple Tank',
+    category: 'music',
+    description:
+      'The wall is a water surface running the real wave equation. Kicks drop stones at the floor, snares at the ceiling, hi-hats are raindrops, the melody stirs its own ripples and the bass rocks the bottom. Waves travel, bounce off the edges and interfere: crests glow cool, troughs warm.',
+    frame: ({ rows, cols, music, state }) => {
+      const S = 3; // simulate on a 3x finer grid, then average down: smooth, round waves
+      const R = rows * S, C = cols * S;
+      if (!state.u || state.R !== R || state.C !== C) {
+        state.u = new Float32Array(R * C);
+        state.p = new Float32Array(R * C);
+        state.n = new Float32Array(R * C);
+        state.R = R; state.C = C; state.peak = 0.3;
+      }
+      const dt = step(state, music.t) || 0.04;
+      const t = music.t;
+      const idx = (r: number, c: number) => r * C + c;
+      const drop = (rr: number, cc: number, amp: number, radius: number) => {
+        for (let r = Math.max(0, Math.floor(rr - 3 * radius)); r <= Math.min(R - 1, Math.ceil(rr + 3 * radius)); r++)
+          for (let c = Math.max(0, Math.floor(cc - 3 * radius)); c <= Math.min(C - 1, Math.ceil(cc + 3 * radius)); c++)
+            state.u[idx(r, c)] += amp * Math.exp(-((r - rr) ** 2 + (c - cc) ** 2) / (2 * radius * radius));
+      };
+      const midC = (C - 1) / 2;
+      if (music.hits.kick) drop(R - 2, midC, 1.5 * music.hits.kick, 2.2);
+      if (music.hits.snare) drop(1, midC, 1.1 * music.hits.snare, 1.8);
+      if (music.hits.hat) drop(3 + Math.random() * (R - 7), Math.random() * (C - 1), 0.35 * music.hits.hat, 1);
+      // Wave equation u_tt = c²∇²u − γu_t, reflecting edges, a few substeps per frame.
+      const steps = 3, h = dt / steps, speed = 30, k = (speed * h) ** 2, damp = 1.8 * h;
+      for (let sstep = 0; sstep < steps; sstep++) {
+        const ts = t - dt + (sstep + 1) * h;
+        // Continuous drivers: the bass rocks the floor, the melody stirs the surface where it is.
+        const bass = (music.bands[0] + music.bands[1]) / 2;
+        state.u[idx(R - 1, Math.round(midC))] += 0.08 * bass * Math.sin(2 * Math.PI * 1.1 * ts);
+        const p = music.pitch;
+        if (p && p.confidence > 0.5) {
+          const pr = Math.round((1 - clamp01((p.midi - 48) / 36)) * (R - 1));
+          const pc = Math.round(((music.stereo.pan[1] + 1) / 2) * (C - 1));
+          state.u[idx(pr, pc)] += 0.12 * p.confidence * Math.sin(2 * Math.PI * 2.4 * ts);
+        }
+        const { u, p: prev, n } = state;
+        for (let r = 0; r < R; r++)
+          for (let c = 0; c < C; c++) {
+            const i = idx(r, c), here = u[i];
+            const lap = u[idx(Math.max(0, r - 1), c)] + u[idx(Math.min(R - 1, r + 1), c)] + u[idx(r, Math.max(0, c - 1))] + u[idx(r, Math.min(C - 1, c + 1))] - 4 * here;
+            n[i] = 2 * here - prev[i] + k * lap - damp * (here - prev[i]);
+          }
+        // A real surface settles back to flat: remove any net offset (each drop adds "water",
+        // and reflecting edges would otherwise keep it forever, slowly lighting the whole wall).
+        let mean = 0;
+        for (let i = 0; i < n.length; i++) mean += n[i];
+        mean /= n.length;
+        for (let i = 0; i < n.length; i++) (n[i] -= mean), (u[i] -= mean);
+        state.p = u; state.u = n; state.n = prev;
+      }
+      // Average each bulb's 3x3 patch: brightness from wave height, warmth from its sign.
+      const v = blank(rows, cols), w = blank(rows, cols);
+      let maxA = 0;
+      const A = blank(rows, cols), Sg = blank(rows, cols);
+      for (let r = 0; r < rows; r++)
+        for (let c = 0; c < cols; c++) {
+          let a = 0, sg = 0;
+          for (let dr = 0; dr < S; dr++) for (let dc = 0; dc < S; dc++) { const x = state.u[idx(r * S + dr, c * S + dc)]; a += Math.abs(x); sg += x; }
+          A[r][c] = a / (S * S); Sg[r][c] = sg / (S * S);
+          maxA = Math.max(maxA, A[r][c]);
+        }
+      state.peak = Math.max(0.25, Math.max(state.peak * Math.exp(-dt / 3), maxA));
+      for (let r = 0; r < rows; r++)
+        for (let c = 0; c < cols; c++) {
+          v[r][c] = 0.1 + 0.08 * music.energy + 0.82 * Math.pow(clamp01(A[r][c] / state.peak), 0.75);
+          w[r][c] = 0.5 + 0.45 * Math.tanh((2 * Sg[r][c]) / state.peak);
+        }
+      return { v, w };
+    },
+  },
+  {
+    id: 'chladni',
+    name: 'Chladni Plate',
+    category: 'music',
+    description:
+      'The wall is a vibrating plate, like sand on a violin-bowed metal sheet. Each of the 12 notes picks a resonance mode, so the pattern of glowing antinodes and dark nodal lines morphs when the harmony changes and swells with the beat. Opposite halves of each mode glow warm and cool.',
+    frame: ({ rows, cols, music, state }) => {
+      const MODES: Array<[number, number]> = [[1, 2], [2, 3], [1, 3], [3, 4], [2, 4], [1, 4], [3, 5], [2, 5], [4, 5], [1, 5], [3, 6], [4, 6]];
+      const t = music.t;
+      step(state, t);
+      // Strongest note name → mode; without clear harmony, drift through modes every 2 bars.
+      const max = Math.max(...music.chroma);
+      const pc = max > 0.35 ? music.chroma.indexOf(max) : Math.floor(music.bar / 2) % 12;
+      if (state.cur === undefined) Object.assign(state, { cur: pc, prev: pc, since: t, cand: pc, candAt: t });
+      if (pc !== state.cand) Object.assign(state, { cand: pc, candAt: t });
+      if (state.cand !== state.cur && t - state.candAt > 0.4) Object.assign(state, { prev: state.cur, cur: state.cand, since: t });
+      const blend = clamp01((t - state.since) / 0.9);
+      const field = (m: number, n: number, x: number, y: number) => Math.cos(n * Math.PI * x) * Math.cos(m * Math.PI * y) - Math.cos(m * Math.PI * x) * Math.cos(n * Math.PI * y);
+      const pulse = 1 + 0.4 * decay(state, 'beat', t, music.hits.beat, 0.3);
+      const amp = (0.35 + 0.65 * music.energy) * pulse;
+      const v = blank(rows, cols), w = blank(rows, cols);
+      for (let r = 0; r < rows; r++)
+        for (let c = 0; c < cols; c++) {
+          const x = (c + 0.5) / cols, y = (r + 0.5) / rows;
+          const [m1, n1] = MODES[state.prev], [m2, n2] = MODES[state.cur];
+          const f = (1 - blend) * field(m1, n1, x, y) + blend * field(m2, n2, x, y);
+          const mag = clamp01(Math.abs(f) / 2);
+          v[r][c] = 0.1 + 0.9 * clamp01(amp * Math.pow(mag, 0.6));
+          w[r][c] = clamp01(0.5 + 0.45 * Math.sign(f) * Math.sqrt(mag));
+        }
+      return { v, w };
+    },
+  },
+  {
+    id: 'harp',
+    name: 'Light Harp',
+    category: 'music',
+    description:
+      'Six columns are six strings, one per frequency band from deep bass to air. Each glows in its own standing-wave shape (bass strings in their fundamental, higher strings in higher harmonics) as loud as its band, and drums pluck them: kick the bass strings, snare the middle, hi-hats the top.',
+    frame: ({ rows, cols, music, state }) => {
+      const t = music.t;
+      const dt = step(state, t);
+      state.pl ??= new Array(cols).fill(0);
+      const pluck = (from: number, to: number, s: number) => { for (let c = from; c <= to && c < cols; c++) state.pl[c] = Math.max(state.pl[c], s); };
+      const third = Math.max(1, Math.floor(cols / 3));
+      if (music.hits.kick) pluck(0, third - 1, music.hits.kick);
+      if (music.hits.snare) pluck(third, 2 * third - 1, music.hits.snare);
+      if (music.hits.hat) pluck(2 * third, cols - 1, 0.7 * music.hits.hat);
+      const v = blank(rows, cols), w = blank(rows, cols);
+      for (let c = 0; c < cols; c++) {
+        state.pl[c] *= Math.exp(-dt / 0.6);
+        const band = music.bands[Math.min(5, Math.floor((c * 6) / cols))] ?? 0;
+        const amp = Math.max(band * 0.85, state.pl[c]);
+        const harmonic = 1 + Math.floor((c * 3) / cols); // 1, 1, 2, 2, 3, 3
+        const vib = 0.78 + 0.22 * Math.cos(2 * Math.PI * (1.1 + 0.45 * c) * t + c);
+        for (let r = 0; r < rows; r++) {
+          const z = (r + 0.5) / rows;
+          // Standing-wave shape, with the fixed ends still glowing softly so the whole column is alive.
+          v[r][c] = 0.1 + 0.9 * clamp01(amp * (0.25 + 0.75 * Math.abs(Math.sin(harmonic * Math.PI * z))) * vib);
+          w[r][c] = 0.12 + 0.76 * (c / Math.max(1, cols - 1));
+        }
+      }
+      return { v, w };
+    },
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    category: 'music',
+    description:
+      'Slow curtains of light flowing across the whole wall. Loudness sets how bright the sky is, each band lights its part of it, the sound’s brightness tints it warm or cool, and every beat sends a soft wave rising from the floor.',
+    frame: ({ rows, cols, music, state }) => {
+      const t = music.t;
+      step(state, t);
+      const s = t * 0.35;
+      const hit = decay(state, 'b', t, music.hits.beat, 0.6);
+      const since = state.b ? t - state.b.at : 99;
+      const waveRow = rows - 1 - since * rows * 1.5;
+      const v = blank(rows, cols), w = blank(rows, cols);
+      for (let r = 0; r < rows; r++)
+        for (let c = 0; c < cols; c++) {
+          // Curtains drift slowly upward (y shifts with time) and fold into each other.
+          const x = (c / Math.max(1, cols - 1)) * 3, y = (r / Math.max(1, rows - 1)) * 4.5 + s * 0.9;
+          const p = (Math.sin(x * 1.1 + s * 1.3) + Math.sin(y * 0.9 - s * 1.7 + Math.sin(x * 0.7 + s)) + Math.sin((x + y) * 0.6 + s * 0.8) + 3) / 6;
+          const band = music.bands[Math.min(5, Math.floor((c * 6) / cols))] ?? 0;
+          const sky = 0.1 + (0.3 + 0.6 * music.energy) * Math.pow(p, 2.1) * (0.55 + 0.45 * band) * 1.6;
+          const rise = hit * 0.45 * Math.exp(-((r - waveRow) ** 2) / 1.4);
+          v[r][c] = clamp01(sky + rise);
+          const tint = (Math.sin(y * 0.8 + s * 1.1 + x * 0.4) + 1) / 2;
+          w[r][c] = clamp01(0.15 + 0.6 * music.timbre.centroid + 0.3 * (tint - 0.5) + 0.3 * rise);
+        }
+      return { v, w };
+    },
+  },
+  {
+    id: 'embers',
+    name: 'Embers',
+    category: 'music',
+    description:
+      'A fire burns along the floor, fed by the bass. Every kick throws glowing embers up against gravity; they arc, slow and fall back, cooling from white-hot to amber. Snares shower sparks from the ceiling, hi-hats flick single sparks.',
+    frame: ({ rows, cols, music, state }) => {
+      const t = music.t;
+      const dt = step(state, t);
+      state.ps ??= [] as Array<{ x: number; y: number; vx: number; vy: number; heat: number }>;
+      const mid = (cols - 1) / 2;
+      if (music.hits.kick) {
+        const n = 4 + Math.round(6 * music.hits.kick);
+        for (let i = 0; i < n; i++)
+          state.ps.push({ x: mid + (Math.random() - 0.5) * 2.5, y: rows - 0.6, vx: (Math.random() - 0.5) * 2.2, vy: -(6 + 6 * Math.random()) * (0.5 + 0.5 * music.hits.kick), heat: 1 });
+      }
+      if (music.hits.snare) for (let i = 0; i < 3; i++) state.ps.push({ x: Math.random() * (cols - 1), y: 0.2, vx: (Math.random() - 0.5) * 1.2, vy: 1.5 + 2 * Math.random(), heat: 0.85 });
+      if (music.hits.hat) state.ps.push({ x: Math.random() * (cols - 1), y: 1 + Math.random() * (rows - 4), vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, heat: 0.6 });
+      // Physics: gravity (rows/s²), air drag, cooling.
+      for (const p of state.ps) {
+        p.vy += 9 * dt;
+        p.vx *= Math.exp(-dt * 0.9);
+        p.vy *= Math.exp(-dt * 0.25);
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.heat -= dt * 0.55;
+      }
+      state.ps = state.ps.filter((p: any) => p.heat > 0 && p.y < rows + 1 && p.x > -1 && p.x < cols).slice(-120);
+      const v = blank(rows, cols), w = blank(rows, cols, 0.1);
+      // The fire bed: warm, flickering, taller with more bass.
+      const bass = (music.bands[0] + music.bands[1]) / 2;
+      for (let r = 0; r < rows; r++)
+        for (let c = 0; c < cols; c++) {
+          const h = rows - 1 - r;
+          const flicker = 0.78 + 0.22 * Math.sin(t * 7 + c * 1.7 + h * 1.3) * Math.sin(t * 3.1 + c);
+          v[r][c] = Math.max(0.08, (0.16 + 0.55 * bass) * Math.exp(-h / (1.1 + 1.6 * bass)) * flicker);
+          w[r][c] = 0.06;
+        }
+      // Splat each ember onto the 4 nearest bulbs; hotter = brighter and whiter.
+      for (const p of state.ps) {
+        const c0 = Math.floor(p.x), r0 = Math.floor(p.y), fx = p.x - c0, fy = p.y - r0;
+        for (const [dr, dc, wt] of [[0, 0, (1 - fx) * (1 - fy)], [0, 1, fx * (1 - fy)], [1, 0, (1 - fx) * fy], [1, 1, fx * fy]] as const) {
+          const r = r0 + dr, c = c0 + dc;
+          if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
+          const add = p.heat * wt * 1.3;
+          v[r][c] = clamp01(v[r][c] + add);
+          w[r][c] = Math.max(w[r][c], clamp01(p.heat * 0.9) * Math.min(1, add * 2));
+        }
+      }
+      return { v, w };
+    },
+  },
   {
     id: 'mix',
     name: 'Full mix',
@@ -352,13 +574,13 @@ export const PATTERNS: Pattern[] = [
 
       // Background wash: brightness from energy, white from the sound's brightness, spread from stereo width.
       if (on('wash')) {
-        const level = 0.05 + 0.2 * music.energy;
+        const level = 0.12 + 0.22 * music.energy;
         const spread = 0.2 + 0.8 * music.stereo.width;
         const warmth = 0.1 + 0.75 * music.timbre.centroid;
         for (let r = 0; r < rows; r++)
           for (let c = 0; c < cols; c++) {
             const d = Math.abs(c - mid) / Math.max(1, mid);
-            const inside = d <= spread + 0.15 ? 1 : 0.25;
+            const inside = d <= spread + 0.15 ? 1 : 0.6;
             put(r, c, level * inside * (0.75 + 0.25 * Math.sin(t * 1.4 + r * 0.7 + c * 0.4)), warmth);
           }
       }

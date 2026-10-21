@@ -140,6 +140,66 @@ const sandbox = () => fs.mkdtempSync(path.join(os.tmpdir(), 'iot-hub-test-'));
     return labels.join(' → ');
   });
 
+  await test('physics looks: every bulb always lit, whole wall used, stable for 60 s', () => {
+    const notes: string[] = [];
+    for (const id of ['ripple-tank', 'chladni', 'harp', 'aurora', 'embers', 'mix']) {
+      const p = patternById(id)!;
+      const met = new Metronome(124, 0);
+      const state: any = {};
+      let min = 1, max = 0;
+      const used = new Set<number>();
+      for (let D = 0; D < 60000; D += 40) {
+        const look: any = p.frame({ rows: 9, cols: 6, tick: 0, seq: [], params: {}, state, canvas: blank(9, 6), music: { ...met.sample(D - 40, D), t: D / 1000, progress: 0 } });
+        (look.v as number[][]).forEach((row, r) => row.forEach((x, c) => { assert.ok(Number.isFinite(x), `${id} NaN`); min = Math.min(min, x); max = Math.max(max, x); if (x > 0.3) used.add(r * 6 + c); }));
+      }
+      assert.ok(min >= 0.07, `${id}: a bulb went dark (${min.toFixed(2)})`);
+      assert.ok(max <= 1, `${id}: overflow`);
+      assert.ok(used.size >= 40, `${id}: only ${used.size}/54 bulbs ever reach 30 %`);
+      notes.push(`${id} ${used.size}/54`);
+    }
+    return notes.join(', ');
+  });
+
+  await test('ripple tank: a single kick travels from the floor to the ceiling', () => {
+    const p = patternById('ripple-tank')!;
+    const met = new Metronome(124, 0);
+    const state: any = {};
+    const peaks = { floor: [0, 0], ceiling: [0, 0] };
+    for (let D = 0; D < 3000; D += 40) {
+      const t = D / 1000;
+      const m = { ...met.sample(D - 40, D), t, progress: 0, bands: [0, 0, 0, 0, 0, 0], energy: 0, pitch: null, hits: { beat: 0, downbeat: 0, kick: Math.abs(t - 0.2) < 0.02 ? 1 : 0, snare: 0, hat: 0 } };
+      const v = (p.frame({ rows: 9, cols: 6, tick: 0, seq: [], params: {}, state, canvas: blank(9, 6), music: m as any }) as any).v as number[][];
+      const f = v[8].reduce((a, b) => a + b, 0), c = v[0].reduce((a, b) => a + b, 0);
+      if (f > peaks.floor[0]) peaks.floor = [f, t];
+      if (c > peaks.ceiling[0]) peaks.ceiling = [c, t];
+    }
+    assert.ok(peaks.floor[1] < peaks.ceiling[1], `floor ${peaks.floor[1]} s, ceiling ${peaks.ceiling[1]} s`);
+    assert.ok(peaks.floor[1] < 0.6, 'floor reacted late');
+    return `floor at ${peaks.floor[1].toFixed(2)} s, ceiling at ${peaks.ceiling[1].toFixed(2)} s`;
+  });
+
+  await test('delivery: a constantly changing look sends each bulb at most ~16 commands/s, with no backlog', async () => {
+    const dir = sandbox();
+    const store = new Store(dir);
+    store.devices = [{ id: 'wiz:x', driver: 'wiz', name: 'X', kind: 'light', address: '127.0.0.1', capabilities: ['power', 'brightness', 'color_temp'] as any, colorTempRange: [2700, 6500], status: 'ready', config: {} }];
+    const layout = createLayout(1, 1);
+    layout.cells = [['wiz:x']];
+    store.saveLayout(layout);
+    const hub = new Hub(store);
+    const sends: number[] = [];
+    (hub as any).stream = () => sends.push(Date.now());
+    const runner = new MatrixRunner(hub, () => store.layout(), () => latencyFor(store.layout()));
+    runner.start('aurora', {}, { preview: false });
+    await new Promise((r) => setTimeout(r, 3000));
+    runner.stop();
+    const gaps = sends.slice(1).map((t, i) => t - sends[i]);
+    const rate = sends.length / 3;
+    assert.ok(rate <= 17, `${rate.toFixed(1)} commands/s`);
+    // Smooth changes are ≥60 ms apart; beat hits may come sooner but never under 30 ms.
+    assert.ok(Math.min(...gaps) >= 28, `gap ${Math.min(...gaps)} ms`);
+    return `${rate.toFixed(1)} commands/s, smallest gap ${Math.min(...gaps)} ms`;
+  });
+
   await test("tests never touch the repo's real layout", () => {
     const after = fs.existsSync(repoLayout) ? fs.readFileSync(repoLayout, 'utf8') : null;
     assert.strictEqual(after, before);

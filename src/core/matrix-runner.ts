@@ -32,6 +32,10 @@ export interface MatrixOptions {
   preview: boolean;
   /** 'beat': basic patterns advance one step per beat instead of on their timer. */
   stepOn: 'timer' | 'beat';
+  /** Soft glow every bulb keeps (0..0.4), so no bulb ever drops to black. */
+  ambient: number;
+  /** Afterglow in seconds: light rises instantly and fades out like a filament. 0 = off. */
+  glow: number;
 }
 
 /** What to play; set by the UI, a show's cue list or the autopilot. */
@@ -73,9 +77,22 @@ export interface MatrixStatus {
   director?: string;
 }
 
+/** Per-bulb delivery state: last command sent and the single pending one. */
+interface SentState {
+  key: string;
+  at: number;
+  /** The one command waiting to go out. `hit` = a beat/drum frame, which later frames may not overwrite. */
+  pending?: { key: string; command: Extract<Command, { type: 'set' }>; at: number; timer?: NodeJS.Timeout; hit?: boolean };
+  /** The newest ordinary frame that arrived while a hit was waiting; sent right after it. */
+  next?: { key: string; command: Extract<Command, { type: 'set' }>; ideal: number };
+}
+
 const FRAME_MS = 40; // 25 fps render; bulbs only get changes
 const RESEND_MS = 1500; // repair lost UDP packets
-const MIN_GAP_MS = 35; // never send one bulb two commands closer than this
+// At most ~16 commands/s per bulb; newer frames replace a pending one, so there's never a backlog.
+const MIN_GAP_MS = 60;
+/** Even hits are never sent to one bulb closer together than this. */
+const HARD_GAP_MS = 30;
 const PALETTE_K = { warm: 2700, neutral: 4000, cool: 6500 } as const;
 
 export const DEFAULT_OPTIONS: MatrixOptions = {
@@ -86,6 +103,8 @@ export const DEFAULT_OPTIONS: MatrixOptions = {
   background: 'off',
   preview: false,
   stepOn: 'timer',
+  ambient: 0.1,
+  glow: 0.15,
 };
 
 export function normaliseOptions(o: Partial<MatrixOptions> = {}, base: MatrixOptions = DEFAULT_OPTIONS): MatrixOptions {
@@ -104,6 +123,8 @@ export function normaliseOptions(o: Partial<MatrixOptions> = {}, base: MatrixOpt
     background: o.background === 'dim' ? 'dim' : o.background === 'off' ? 'off' : base.background,
     preview: o.preview === undefined ? base.preview : !!o.preview,
     stepOn: o.stepOn === 'beat' ? 'beat' : o.stepOn === 'timer' ? 'timer' : base.stepOn,
+    ambient: o.ambient !== undefined && Number.isFinite(Number(o.ambient)) ? Math.max(0, Math.min(0.4, Number(o.ambient))) : base.ambient,
+    glow: o.glow !== undefined && Number.isFinite(Number(o.glow)) ? Math.max(0, Math.min(1.5, Number(o.glow))) : base.glow,
   };
 }
 
@@ -123,7 +144,11 @@ export class MatrixRunner {
   /** Recent rendered frames, so the on-screen preview shows what's visible *now*, not the future. */
   private history: Array<{ D: number; v: Frame; w?: Frame }> = [];
   private lastMusic?: Sample;
-  private sent = new Map<string, { key: string; at: number }>();
+  /** Per bulb: what was last sent, and the one command waiting to be sent (if any). */
+  private sent = new Map<string, SentState>();
+  /** Previous displayed frame and when, for afterglow. */
+  private glowFrame?: Frame;
+  private glowAt = 0;
   private timers = new Set<NodeJS.Timeout>();
   private flasher?: { id: string; timer: NodeJS.Timeout };
 
@@ -188,6 +213,9 @@ export class MatrixRunner {
     this.selection = undefined;
     this.director = undefined;
     this.history = [];
+    this.glowFrame = undefined;
+    this.glowAt = 0;
+    this.sent.clear();
     return this.status();
   }
 
@@ -284,13 +312,27 @@ export class MatrixRunner {
         params: this.selection!.params ?? {}, state: this.state, canvas: this.canvas, music,
       })
     );
-    const v = look.v.map((row) => row.map((x) => Math.max(0, Math.min(1, Number(x) || 0))));
+    let v = look.v.map((row) => row.map((x) => Math.max(0, Math.min(1, Number(x) || 0))));
     const w = look.w?.map((row) => row.map((x) => Math.max(0, Math.min(1, Number(x) || 0))));
+    // Afterglow: light rises at once but fades with a time constant, like a filament cooling.
+    // It also crossfades smoothly when the look changes.
+    const o = this.options;
+    const dt = this.glowAt ? Math.max(0, (now - this.glowAt) / 1000) : 0;
+    this.glowAt = now;
+    const prevGlow = this.glowFrame;
+    if (o.glow > 0 && prevGlow && prevGlow.length === v.length && prevGlow[0]?.length === v[0]?.length) {
+      const k = Math.exp(-dt / o.glow);
+      v = v.map((row, r) => row.map((x, c) => Math.max(x, prevGlow[r][c] * k)));
+    }
+    this.glowFrame = v;
+    // Ambient floor: every bulb keeps a soft glow, so the whole wall stays alive.
+    if (o.ambient > 0) v = v.map((row) => row.map((x) => o.ambient + (1 - o.ambient) * x));
     // A frame with a hit is shown on the hit's exact time, not at the frame edge (up to 40 ms later).
-    const showAt = sample.hitAt !== undefined && sample.hitAt > prevD - FRAME_MS && sample.hitAt <= D ? sample.hitAt : D;
+    const hitFrame = sample.hitAt !== undefined && sample.hitAt > prevD - FRAME_MS && sample.hitAt <= D;
+    const showAt = hitFrame ? sample.hitAt! : D;
     this.history.push({ D: showAt, v, w });
     this.trimHistory(now);
-    this.dispatch(layout, v, w, showAt, lat);
+    this.dispatch(layout, v, w, showAt, lat, hitFrame);
   }
 
   private trimHistory(now: number) {
@@ -300,7 +342,7 @@ export class MatrixRunner {
     if (firstVisible > 0) this.history.splice(0, firstVisible);
   }
 
-  private dispatch(layout: MatrixLayout, v: Frame, w: Frame | undefined, D: number, lat: Latency) {
+  private dispatch(layout: MatrixLayout, v: Frame, w: Frame | undefined, D: number, lat: Latency, urgent = false) {
     if (this.options.preview) return;
     const devices = new Map(this.hub.devices().map((d) => [d.id, d]));
     const now = Date.now();
@@ -310,21 +352,67 @@ export class MatrixRunner {
         if (!device || device.status !== 'ready') return;
         const command = this.commandFor(device, v[r]?.[c] ?? 0, w?.[r]?.[c], r, c, layout);
         const key = JSON.stringify(command);
-        const last = this.sent.get(device.id);
-        const sendAt = Math.max(now, D - (lat.perBulb[device.id] ?? lat.baseMs), last ? last.at + MIN_GAP_MS : 0);
-        if (last && last.key === key && sendAt - last.at < RESEND_MS) return;
-        this.sent.set(device.id, { key, at: sendAt });
-        const fire = () => this.hub.stream(device, command);
-        if (sendAt - now < 4) fire();
-        else {
-          const t = setTimeout(() => {
-            this.timers.delete(t);
-            fire();
-          }, sendAt - now);
-          this.timers.add(t);
+        const st = this.sent.get(device.id) ?? { key: '', at: 0 };
+        this.sent.set(device.id, st);
+        const ideal = D - (lat.perBulb[device.id] ?? lat.baseMs);
+        const p = st.pending;
+        if (p) {
+          // A waiting hit is never overwritten; the newest ordinary frame follows right after it.
+          if (p.hit && !urgent) {
+            st.next = { key, command, ideal };
+            return;
+          }
+          if (p.key === key) return;
+          // Otherwise a newer frame replaces what's waiting but keeps its time slot, so a
+          // constantly changing look can never postpone a bulb forever.
+          p.key = key;
+          p.command = command;
+          if (urgent) {
+            p.hit = true;
+            st.next = undefined;
+            if (ideal < p.at - 2) this.schedule(device, st, Math.max(now, ideal, st.at + HARD_GAP_MS));
+          }
+          return;
         }
+        if (st.key === key && now - st.at < RESEND_MS) return;
+        // Hits go out at their exact time; smooth changes respect the per-bulb rate limit.
+        st.pending = { key, command, at: 0, hit: urgent };
+        this.schedule(device, st, Math.max(now, ideal, st.at + (urgent ? HARD_GAP_MS : MIN_GAP_MS)));
       })
     );
+  }
+
+  /** (Re)arm the bulb's single pending send for time `at`; it sends whatever is pending then. */
+  private schedule(device: Device, st: SentState, at: number) {
+    const p = st.pending!;
+    if (p.timer) {
+      clearTimeout(p.timer);
+      this.timers.delete(p.timer);
+    }
+    p.at = at;
+    const fire = () => {
+      const cur = st.pending;
+      if (!cur) return;
+      st.pending = undefined;
+      st.key = cur.key;
+      st.at = Date.now();
+      this.hub.stream(device, cur.command);
+      // Whatever arrived while a hit was waiting goes next, at the normal rate.
+      const nx = st.next;
+      st.next = undefined;
+      if (nx && nx.key !== st.key) {
+        st.pending = { key: nx.key, command: nx.command, at: 0 };
+        this.schedule(device, st, Math.max(Date.now(), nx.ideal, st.at + MIN_GAP_MS));
+      }
+    };
+    const wait = at - Date.now();
+    if (wait < 4) return fire();
+    const t = setTimeout(() => {
+      this.timers.delete(t);
+      fire();
+    }, wait);
+    this.timers.add(t);
+    p.timer = t;
   }
 
   private commandFor(device: Device, v: number, w: number | undefined, r: number, c: number, layout: MatrixLayout): Extract<Command, { type: 'set' }> {

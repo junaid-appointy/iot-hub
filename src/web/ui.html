@@ -292,7 +292,9 @@
   .lab-scope.short { height: 96px; }
   .lab-light { font-size: 12.5px; color: var(--muted); margin: 0; }
   .lab-light strong { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
-  .lab-layers { display: flex; flex-wrap: wrap; gap: 6px; }
+  .lab-layers, .lab-looks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .lab-looks button { border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .lab-looks button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
   .lab-layers button { border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; }
   .lab-layers button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
   .lab-lamps { display: flex; gap: 10px; }
@@ -922,7 +924,7 @@
   const MX = {
     info: null, mode: 'map', pattern: 'wipe', params: {}, selectedCell: null, picked: null,
     wizard: null, // { current, skipped: Set, history: [] }
-    options: { tickMs: 600, maxBrightness: 100, kelvin: 6500, palette: 'dual', background: 'off', preview: true },
+    options: { tickMs: 600, maxBrightness: 100, kelvin: 6500, palette: 'dual', background: 'off', preview: true, ambient: 0.1, glow: 0.15 },
     brush: 1, painting: false,
   };
   const mxRunning = () => !!MX.info?.status?.running;
@@ -1223,6 +1225,23 @@
     try { MX.info.status = await api('/matrix/pixel', { body: { row: r, col: c, value: MX.paintValue } }); } catch {}
   }
 
+  /** Ambient glow (no bulb ever goes black) and afterglow (light fades like a filament). */
+  function glowControlsHtml() {
+    const o = MX.options;
+    return `<label class="slider-row" title="Every bulb keeps at least this much light, so the whole wall stays alive">Ambient glow<input type="range" min="0" max="40" step="2" value="${Math.round((o.ambient ?? 0.1) * 100)}" data-glow="ambient"/><output>${Math.round((o.ambient ?? 0.1) * 100)}%</output></label>
+      <label class="slider-row" title="How slowly light fades after it rises, like a filament cooling">Afterglow<input type="range" min="0" max="100" step="5" value="${Math.round((o.glow ?? 0.15) * 100)}" data-glow="glow"/><output>${(o.glow ?? 0.15).toFixed(2)} s</output></label>`;
+  }
+  let glowTimer;
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (!t.dataset || !t.dataset.glow) return;
+    const key = t.dataset.glow;
+    MX.options[key] = +t.value / 100;
+    t.nextElementSibling.textContent = key === 'ambient' ? `${t.value}%` : `${(+t.value / 100).toFixed(2)} s`;
+    clearTimeout(glowTimer);
+    glowTimer = setTimeout(() => api('/matrix/update', { body: { options: { ambient: MX.options.ambient, glow: MX.options.glow } } }).catch(() => {}), 120);
+  });
+
   function optionsHtml(music = false) {
     const o = MX.options;
     const rate = (1000 / o.tickMs).toFixed(1);
@@ -1232,6 +1251,7 @@
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
         ${music ? '' : `<label class="slider-row">Speed<input type="range" min="250" max="2000" step="50" value="${2250 - o.tickMs}" data-opt="speed"/><output>${rate}/s</output></label>`}
         <label class="slider-row">Brightness<input type="range" min="10" max="100" step="10" value="${o.maxBrightness}" data-opt="maxBrightness"/><output>${o.maxBrightness}%</output></label>
+        ${glowControlsHtml()}
         <div class="row2"><label class="f">White<select class="field" data-opt="palette">${PALETTES.map(([k, l]) => `<option value="${k}" ${k === o.palette ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label class="f">Unlit bulbs<select class="field" data-opt="background"><option value="off" ${o.background === 'off' ? 'selected' : ''}>Off</option><option value="dim" ${o.background === 'dim' ? 'selected' : ''}>Dim glow</option></select></label></div>
       </div>
@@ -1926,7 +1946,9 @@
   }
 
   // ---------- Sound Lab: every property of the sound, live ----------
-  const LAB = { built: false, layers: { wash: true, bass: true, kick: true, snare: true, hats: true, melody: true, drops: true }, last: null, n: 0, img: null, lamps: {}, pollTimer: 0 };
+  const LAB = { built: false, look: 'ripple-tank', layers: { wash: true, bass: true, kick: true, snare: true, hats: true, melody: true, drops: true }, last: null, n: 0, img: null, lamps: {}, pollTimer: 0 };
+  const LAB_LOOKS = ['ripple-tank', 'chladni', 'harp', 'aurora', 'embers', 'mix'];
+  const lookInfo = (id) => MX.info?.patterns.find((p) => p.id === id) || { name: id, description: '' };
   const LAB_LAYERS = [['wash', 'Wash'], ['bass', 'Bass'], ['kick', 'Kick'], ['snare', 'Snare'], ['hats', 'Hats'], ['melody', 'Melody'], ['drops', 'Drops']];
   const LAB_WARM = [255, 168, 86], LAB_COOL = [212, 229, 255];
   const labMix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -1971,10 +1993,15 @@
           <div class="lab-card">
             <h4>On the wall</h4>
             <canvas id="labWall" class="lab-wall" aria-label="Wall preview"></canvas>
-            <div class="btnrow"><button class="btn primary" data-lab="wall" id="labWallBtn">▶ Play Full mix</button></div>
+            <div class="lab-looks" id="labLooks" role="group" aria-label="Look">${LAB_LOOKS.map((id) => `<button data-look="${id}" aria-pressed="${id === LAB.look}">${esc(lookInfo(id).name)}</button>`).join('')}</div>
+            <p class="desc" id="labLookDesc">${esc(lookInfo(LAB.look).description)}</p>
+            <div class="btnrow"><button class="btn primary" data-lab="wall" id="labWallBtn">▶ Play</button></div>
             <label class="check"><input type="checkbox" id="labLive" /> Send to real bulbs</label>
-            <div class="lab-layers" id="labLayers" role="group" aria-label="Layers">${LAB_LAYERS.map(([k, l]) => `<button data-layer="${k}" aria-pressed="true">${l}</button>`).join('')}</div>
-            <p class="desc">Each layer is driven by one property of the sound. Switch layers off to watch one part on its own.</p>
+            <div id="labLayerBox" ${LAB.look === 'mix' ? '' : 'hidden'}>
+              <div class="lab-layers" id="labLayers" role="group" aria-label="Layers">${LAB_LAYERS.map(([k, l]) => `<button data-layer="${k}" aria-pressed="true">${l}</button>`).join('')}</div>
+              <p class="desc">Each layer is driven by one property of the sound. Switch layers off to watch one part on its own.</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">${glowControlsHtml()}</div>
           </div>
         </aside>
         <div class="lab-grid">
@@ -2028,9 +2055,9 @@
 
   function labUpdateWallButton() {
     const st = MX.info?.status;
-    const on = !!st?.running && st.pattern === 'mix';
+    const on = !!st?.running && st.pattern === LAB.look;
     const b = $('#labWallBtn');
-    if (b) { b.textContent = on ? '■ Stop' : '▶ Play Full mix'; b.classList.toggle('primary', !on); }
+    if (b) { b.textContent = on ? '■ Stop' : `▶ Play ${lookInfo(LAB.look).name}`; b.classList.toggle('primary', !on); }
     const live = $('#labLive');
     if (live) live.checked = !MX.options.preview;
   }
@@ -2038,25 +2065,37 @@
   async function labToggleWall() {
     const st = MX.info?.status;
     try {
-      if (st?.running && st.pattern === 'mix') MX.info.status = await api('/matrix/stop', { method: 'POST' });
-      else {
-        if (!AUDIO.source) toast('No sound yet', 'Pick a source on the left so the wall has something to follow.');
-        MX.info.status = await api('/matrix/play', { body: { pattern: 'mix', params: LAB.layers, options: { ...MX.options, palette: 'dual', stepOn: 'timer', tickMs: 400 } } });
-      }
+      if (st?.running && st.pattern === LAB.look) MX.info.status = await api('/matrix/stop', { method: 'POST' });
+      else await labPlayLook();
     } catch (e) { toast(e.message, e.hint, true); }
     labUpdateWallButton();
+  }
+
+  async function labPlayLook() {
+    if (!AUDIO.source) toast('No sound yet', 'Pick a source on the left so the wall has something to follow.');
+    MX.info.status = await api('/matrix/play', { body: { pattern: LAB.look, params: LAB.look === 'mix' ? LAB.layers : {}, options: { ...MX.options, palette: 'dual', stepOn: 'timer', tickMs: 400 } } });
   }
 
   function wireLab() {
     const v = $('#labView');
     v.addEventListener('click', async (e) => {
-      const b = e.target.closest('[data-lab],[data-layer]');
+      const b = e.target.closest('[data-lab],[data-layer],[data-look]');
       if (!b) return;
+      if (b.dataset.look) {
+        const wasPlaying = MX.info?.status?.running && LAB_LOOKS.includes(MX.info.status.pattern);
+        LAB.look = b.dataset.look;
+        labAll('#labLooks button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        $('#labLookDesc').textContent = lookInfo(LAB.look).description;
+        $('#labLayerBox').hidden = LAB.look !== 'mix';
+        if (wasPlaying) { try { await labPlayLook(); } catch (err) { toast(err.message, err.hint, true); } }
+        labUpdateWallButton();
+        return;
+      }
       if (b.dataset.layer) {
         const k = b.dataset.layer;
         LAB.layers[k] = !LAB.layers[k];
         b.setAttribute('aria-pressed', String(LAB.layers[k]));
-        if (MX.info?.status?.running && MX.info.status.pattern === 'mix') api('/matrix/update', { body: { params: LAB.layers } }).catch(() => {});
+        if (MX.info?.status?.running && MX.info.status.pattern === 'mix' && LAB.look === 'mix') api('/matrix/update', { body: { params: LAB.layers } }).catch(() => {});
         return;
       }
       const act = b.dataset.lab;

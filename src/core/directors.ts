@@ -58,28 +58,25 @@ interface Look {
 
 const LOOKS: Record<'calm' | 'groove' | 'peak', Look[]> = {
   calm: [
+    { pattern: 'aurora', palette: 'dual' },
+    { pattern: 'chladni', palette: 'dual' },
+    { pattern: 'ripple-tank', palette: 'dual' },
     { pattern: 'breathe', palette: 'dual' },
-    { pattern: 'wave', palette: 'dual' },
-    { pattern: 'hat-rain', palette: 'dual' },
-    { pattern: 'pulse', palette: 'warm' },
   ],
   groove: [
     { pattern: 'mix', palette: 'dual' },
+    { pattern: 'harp', palette: 'dual' },
+    { pattern: 'ripple-tank', palette: 'dual' },
+    { pattern: 'chladni', palette: 'dual' },
     { pattern: 'kick-snare', palette: 'dual' },
     { pattern: 'scanner', palette: 'dual' },
-    { pattern: 'quadrants', palette: 'dual' },
-    { pattern: 'chase', palette: 'cool', stepOn: 'beat' },
-    { pattern: 'diagonal', palette: 'dual' },
-    { pattern: 'beat-climb', palette: 'dual' },
-    { pattern: 'scanner', palette: 'dual', params: { axis: 'rows' } },
   ],
   peak: [
+    { pattern: 'embers', palette: 'dual' },
     { pattern: 'mix', palette: 'dual' },
+    { pattern: 'ripple-tank', palette: 'dual' },
+    { pattern: 'harp', palette: 'dual' },
     { pattern: 'burst', palette: 'dual' },
-    { pattern: 'mirror-spectrum', palette: 'dual' },
-    { pattern: 'beat-sparkle', palette: 'cool' },
-    { pattern: 'kick-snare', palette: 'dual' },
-    { pattern: 'checker', palette: 'cool', stepOn: 'beat' },
   ],
 };
 
