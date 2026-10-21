@@ -11,6 +11,7 @@ git clone <this repo> iot-hub && cd iot-hub && npm install
 npm run ui                   # web dashboard at http://localhost:7070 (opens your browser)
 npm run iot -- scan          # find everything, auto-connect, guided setup for the rest
 npm run iot                  # interactive menu
+npm test                     # fast regression tests (no bulbs needed)
 # or install the `iot` command globally:
 npm run build && npm link
 ```

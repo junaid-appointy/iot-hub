@@ -11,7 +11,8 @@
     "iot": "tsx src/cli/main.ts",
     "ui": "tsx src/cli/main.ts ui",
     "build": "tsc && cp src/web/ui.html src/web/audio.js dist/web/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx test/run.ts"
   },
   "type": "commonjs",
   "license": "ISC",

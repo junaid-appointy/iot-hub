@@ -274,6 +274,7 @@
       this.listeners = new Set();
       this.running = false;
       this.source = null;
+      this.clock = wallNow; // replaceable for testing (e.g. song time in an offline render)
       this.reset();
     }
 
@@ -281,7 +282,9 @@
       this.peaks = BAND_EDGES.slice(1).map(() => -60);
       this.levelPeak = -40;
       this.detectors = { kick: new OnsetDetector(140), snare: new OnsetDetector(110, 1.8), hat: new OnsetDetector(65, 1.9) };
+      this._startedAt = undefined;
       this.tracker = new BeatTracker();
+      if (this.clock) this.tracker.clock = this.clock;
     }
 
     async ensureContext() {
@@ -292,6 +295,17 @@
         this.analyser.smoothingTimeConstant = 0;
         this.freq = new Float32Array(this.analyser.frequencyBinCount);
         this.time = new Float32Array(this.analyser.fftSize);
+        // Left/right analysis for stereo position and width.
+        this.splitter = this.ctx.createChannelSplitter(2);
+        this.anL = this.ctx.createAnalyser();
+        this.anR = this.ctx.createAnalyser();
+        for (const an of [this.anL, this.anR]) { an.fftSize = 2048; an.smoothingTimeConstant = 0.3; }
+        this.splitter.connect(this.anL, 0);
+        this.splitter.connect(this.anR, 1);
+        this.tl = new Float32Array(2048); this.tr = new Float32Array(2048);
+        this.fl = new Float32Array(1024); this.fr = new Float32Array(1024);
+        this.prevMag = new Float32Array(this.analyser.frequencyBinCount);
+        this.mag = new Float32Array(this.analyser.frequencyBinCount);
       }
       if (this.ctx.state === 'suspended') await this.ctx.resume();
     }
@@ -333,6 +347,7 @@
       this.source = kind;
       this.input = this.ctx.createMediaStreamSource(this.stream);
       this.input.connect(this.analyser);
+      this.input.connect(this.splitter);
       this.stream.getAudioTracks()[0]?.addEventListener('ended', () => {
         this.stop();
         this.onEnded?.(kind);
@@ -348,6 +363,7 @@
       el._iotSource ??= this.ctx.createMediaElementSource(el);
       this.input = el._iotSource;
       this.input.connect(this.analyser);
+      this.input.connect(this.splitter);
       this.analyser.connect(this.ctx.destination);
       this.reset();
       this.start();
@@ -417,20 +433,130 @@
       this.levelPeak = Math.max(levelDb, this.levelPeak - 0.05);
       const level = levelDb < SILENCE_DB ? 0 : clamp01((levelDb - (this.levelPeak - DYNAMIC_RANGE_DB)) / DYNAMIC_RANGE_DB);
 
-      const now = wallNow();
+      const now = this.clock();
       const heard = this.heardTime(now);
       const onsets = [];
-      if (level > 0.05) {
-        for (const [drum, [lo, hi]] of Object.entries(DRUMS)) {
-          const s = this.detectors[drum].push(lin(lo, hi), heard, this.sensitivity);
-          if (s) {
-            onsets.push({ type: drum, at: Math.round(heard), strength: s });
-            this.tracker.onOnset(drum, heard, s);
-          }
+      // How noise-like a band is (0 = clear tones, 1 = hiss). Snares and hats are noise;
+      // melody notes are tones whose overtones would otherwise trigger the snare/hat ranges.
+      const bandFlatness = (lo, hi) => {
+        let logSum = 0, linSum = 0, c = 0;
+        for (let i = Math.max(1, Math.floor(lo / binHz)); i <= Math.min(this.freq.length - 1, Math.ceil(hi / binHz)); i++) {
+          const pw = Math.pow(10, this.freq[i] / 10) + 1e-14;
+          logSum += Math.log(pw); linSum += pw; c++;
         }
+        return c ? Math.exp(logSum / c) / (linSum / c) : 0;
+      };
+      // Power per Hz in the snare and hat ranges, and how much it just rose.
+      const density = (lo, hi) => { const m = lin(lo, hi); return m * m; };
+      const snareP = density(...DRUMS.snare), hatP = density(...DRUMS.hat);
+      const prev = this._prevDrumP || { snare: snareP, hat: hatP };
+      const kickP = density(...DRUMS.kick);
+      const riseSnare = Math.max(0, snareP - prev.snare), riseHat = Math.max(0, hatP - prev.hat), riseKick = Math.max(0, kickP - (prev.kick ?? kickP));
+      this._prevDrumP = { snare: snareP, hat: hatP, kick: kickP };
+      // Let the detectors' running averages settle (~0.6 s) before trusting any hit.
+      this._startedAt ??= now;
+      if (level > 0.05 && now - this._startedAt > 600) {
+        const hit = {};
+        for (const [drum, [lo, hi]] of Object.entries(DRUMS)) hit[drum] = this.detectors[drum].push(lin(lo, hi), heard, this.sensitivity);
+        if (hit.kick) onsets.push({ type: 'kick', at: Math.round(heard), strength: hit.kick });
+        if (this.debug && (hit.snare || hit.hat)) this.debug.push({ t: now, riseSnare, riseHat, riseKick, kick: !!hit.kick });
+        if (hit.snare || hit.hat) {
+          // Hi-hat hiss also reaches the snare range and vice versa: decide which drum it was from
+          // where the new energy is concentrated (hats are dense above 7 kHz, snares around 2–5 kHz).
+          const isHat = riseHat > 2 * riseSnare;
+          const type = isHat ? 'hat' : 'snare';
+          const [lo, hi] = DRUMS[type];
+          // A kick's attack splashes a little energy into the snare range (≈1e-6 of its own rise);
+          // a real snare on top of a kick adds hundreds of times more. Only count the real thing.
+          const kickSplash = hit.kick && riseKick > 0 && riseSnare / riseKick < 3e-5;
+          // Melody notes are tones; their overtones can trigger the snare range. Drums are noise.
+          const tonal = type === 'snare' && bandFlatness(lo, hi) < 0.2;
+          if (!(type === 'snare' && (kickSplash || tonal))) onsets.push({ type, at: Math.round(heard), strength: Math.max(hit.snare || 0, hit.hat || 0) });
+        }
+        for (const o of onsets) this.tracker.onOnset(o.type, heard, o.strength);
       }
       this.tracker.tick(heard);
-      return { level, bands, onsets, beat: onsets.some((o) => o.type === 'kick'), bpm: this.tracker.bpm, locked: this.tracker.locked, confidence: this.tracker.confidence, now };
+      const extra = this.colourAndSpace(binHz, level);
+      return { level, bands, onsets, beat: onsets.some((o) => o.type === 'kick'), bpm: this.tracker.bpm, locked: this.tracker.locked, confidence: this.tracker.confidence, now, ...extra };
+    }
+
+    /**
+     * Stereo (balance, width, where low/mid/high sit), timbre (brightness, noisiness,
+     * change), the strongest melody note, and chroma.
+     */
+    colourAndSpace(binHz, level) {
+      const ema = (key, v, a) => (this[key] = this[key] === undefined ? v : this[key] + (v - this[key]) * a);
+      // --- stereo
+      this.anL.getFloatTimeDomainData(this.tl); this.anR.getFloatTimeDomainData(this.tr);
+      this.anL.getFloatFrequencyData(this.fl); this.anR.getFloatFrequencyData(this.fr);
+      let l2 = 0, r2 = 0, lr = 0;
+      for (let i = 0; i < this.tl.length; i++) { l2 += this.tl[i] * this.tl[i]; r2 += this.tr[i] * this.tr[i]; lr += this.tl[i] * this.tr[i]; }
+      // A mono microphone fills only the left channel: report it as centred and narrow.
+      const mono = l2 < 1e-9 || r2 < 1e-9 || Math.min(l2, r2) / Math.max(l2, r2) < 0.001;
+      const balance = mono ? 0 : (Math.sqrt(r2) - Math.sqrt(l2)) / (Math.sqrt(r2) + Math.sqrt(l2));
+      const corr = mono ? 1 : lr / Math.sqrt(l2 * r2);
+      const sBin = this.ctx.sampleRate / 2048;
+      const regionPan = ([lo, hi]) => {
+        if (mono) return 0;
+        let eL = 0, eR = 0;
+        for (let i = Math.max(1, Math.floor(lo / sBin)); i <= Math.min(this.fl.length - 1, Math.ceil(hi / sBin)); i++) { eL += Math.pow(10, this.fl[i] / 10); eR += Math.pow(10, this.fr[i] / 10); }
+        return eL + eR > 1e-12 ? (eR - eL) / (eR + eL) : 0;
+      };
+      const stereo = {
+        balance: ema('_bal', balance, 0.2),
+        width: ema('_wid', Math.max(0, Math.min(1, (1 - corr) / 1.2)), 0.1),
+        pan: [ema('_p0', regionPan([40, 250]), 0.2), ema('_p1', regionPan([250, 2500]), 0.25), ema('_p2', regionPan([2500, 12000]), 0.3)],
+      };
+      // --- timbre (from the mono spectrum)
+      let cw = 0, cm = 0, logSum = 0, linSum = 0, cnt = 0, fluxUp = 0, total = 0;
+      const chroma = new Array(12).fill(0);
+      for (let i = 1; i < this.freq.length; i++) {
+        const m = Math.pow(10, this.freq[i] / 20);
+        this.mag[i] = m;
+        const f = i * binHz;
+        if (f < 16000) { cw += f * m; cm += m; total += m; fluxUp += Math.max(0, m - this.prevMag[i]); }
+        if (f > 100 && f < 10000) { const pw = m * m + 1e-14; logSum += Math.log(pw); linSum += pw; cnt++; }
+        if (f > 110 && f < 2000 && m > 1e-4) chroma[(((Math.round(69 + 12 * Math.log2(f / 440))) % 12) + 12) % 12] += m * m;
+      }
+      this.prevMag.set(this.mag);
+      const centroidHz = cm ? cw / cm : 0;
+      const timbre = {
+        centroidHz,
+        centroid: ema('_cen', Math.max(0, Math.min(1, Math.log(Math.max(150, centroidHz) / 150) / Math.log(8000 / 150))), 0.25),
+        flatness: ema('_flat', cnt ? Math.min(1, Math.exp(logSum / cnt) / (linSum / cnt)) * 2.5 : 0, 0.2),
+        flux: ema('_flux', total ? Math.min(1, (fluxUp / total) * 3) : 0, 0.4),
+      };
+      const cmax = Math.max(...chroma) || 1;
+      // --- melody: the strongest *peaked* note between E3 and E6 whose fundamental is really there.
+      // Spectrum is whitened (each bin vs its neighbourhood) so loud bass/kick energy can't win.
+      let pitch = null;
+      if (level > 0.08) {
+        const nb = this.freq.length;
+        this._white ??= new Float32Array(nb);
+        const W = this._white;
+        for (let i = 1; i < nb - 1; i++) {
+          let s = 0, c = 0;
+          for (let j = Math.max(1, i - 6); j <= Math.min(nb - 1, i + 6); j++) if (Math.abs(j - i) > 1) (s += this.freq[j]), c++;
+          const peak = this.freq[i] >= this.freq[i - 1] && this.freq[i] >= this.freq[i + 1];
+          W[i] = peak ? Math.max(0, this.freq[i] - s / c - 3) : 0; // dB above the local floor
+        }
+        const at = (f) => { const b = Math.round(f / binHz); return Math.max(W[b - 1] || 0, W[b] || 0, W[b + 1] || 0); };
+        let best = 0, bestMidi = 0, second = 0;
+        for (let m = 52; m <= 88; m++) {
+          const f0 = 440 * Math.pow(2, (m - 69) / 12);
+          const fund = at(f0);
+          if (fund < 4) continue; // the note itself must stand out
+          let sal = fund;
+          for (let h = 2; h <= 4; h++) sal += at(f0 * h) * Math.pow(0.7, h - 1);
+          if (sal > best) (second = best), (best = sal), (bestMidi = m);
+          else if (sal > second) second = sal;
+        }
+        const confidence = best > 0 ? Math.max(0, Math.min(1, best / 30)) * Math.max(0.3, 1 - second / best) : 0;
+        this._pitchHist = [...(this._pitchHist || []).slice(-2), best ? bestMidi : 0];
+        const stable = this._pitchHist.length === 3 && this._pitchHist.filter((x) => Math.abs(x - bestMidi) <= 1).length >= 2;
+        if (best && confidence > 0.3 && stable) pitch = { midi: bestMidi, confidence };
+      }
+      return { stereo, timbre, pitch, chroma: chroma.map((x) => x / cmax) };
     }
   }
 

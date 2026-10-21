@@ -324,6 +324,110 @@ export const PATTERNS: Pattern[] = [
   // These read ctx.music (beat position, bar, kick/snare/hat hits, energy). Without
   // music they run on a 120 BPM metronome, so they can be previewed anywhere.
   {
+    id: 'mix',
+    name: 'Full mix',
+    category: 'music',
+    description:
+      'Every part of the sound in its own layer: kick on the floor, snare on the ceiling, hi-hat glints, a bass column, the melody as a point (height = pitch, side = stereo position), and a background wash whose warmth follows how bright the sound is and whose spread follows its stereo width. Blinder on drops.',
+    params: [
+      { key: 'wash', label: 'Background wash (energy, brightness, width)', type: 'toggle', default: true },
+      { key: 'bass', label: 'Bass column', type: 'toggle', default: true },
+      { key: 'kick', label: 'Kick on the floor', type: 'toggle', default: true },
+      { key: 'snare', label: 'Snare on the ceiling', type: 'toggle', default: true },
+      { key: 'hats', label: 'Hi-hat glints', type: 'toggle', default: true },
+      { key: 'melody', label: 'Melody point (pitch + stereo)', type: 'toggle', default: true },
+      { key: 'drops', label: 'Blinder on drops', type: 'toggle', default: true },
+    ],
+    frame: ({ rows, cols, music, state, params }) => {
+      const on = (k: string) => params[k] !== false;
+      const t = music.t;
+      const dt = step(state, t);
+      const v = blank(rows, cols), w = blank(rows, cols, 0.5);
+      const put = (r: number, c: number, val: number, warm: number) => {
+        if (r < 0 || c < 0 || r >= rows || c >= cols || val <= v[r][c]) return;
+        v[r][c] = clamp01(val);
+        w[r][c] = clamp01(warm);
+      };
+      const mid = (cols - 1) / 2;
+
+      // Background wash: brightness from energy, white from the sound's brightness, spread from stereo width.
+      if (on('wash')) {
+        const level = 0.05 + 0.2 * music.energy;
+        const spread = 0.2 + 0.8 * music.stereo.width;
+        const warmth = 0.1 + 0.75 * music.timbre.centroid;
+        for (let r = 0; r < rows; r++)
+          for (let c = 0; c < cols; c++) {
+            const d = Math.abs(c - mid) / Math.max(1, mid);
+            const inside = d <= spread + 0.15 ? 1 : 0.25;
+            put(r, c, level * inside * (0.75 + 0.25 * Math.sin(t * 1.4 + r * 0.7 + c * 0.4)), warmth);
+          }
+      }
+
+      // Bass: a warm column in the middle, as tall as the low end is loud (fast rise, slower fall).
+      if (on('bass')) {
+        const low = (music.bands[0] + music.bands[1]) / 2;
+        state.bass = Math.max(low, (state.bass ?? 0) - dt * 2.2);
+        const height = state.bass * rows * 0.6;
+        const centre = [Math.floor(mid), Math.ceil(mid)];
+        for (let k = 0; k < Math.ceil(height); k++) for (const c of centre) put(rows - 1 - k, c, state.bass * (1 - k * 0.12) * Math.min(1, height - k), 0.06);
+      }
+
+      // Kick: thump on the floor.
+      if (on('kick')) {
+        const k = decay(state, 'kick', t, music.hits.kick, 0.16);
+        for (let c = 0; c < cols; c++) (put(rows - 1, c, k, 0.04), put(rows - 2, c, k * 0.55, 0.1));
+      }
+
+      // Snare: crack on the ceiling.
+      if (on('snare')) {
+        const sn = decay(state, 'snare', t, music.hits.snare, 0.11);
+        for (let c = 0; c < cols; c++) (put(0, c, sn, 1), put(1, c, sn * 0.5, 0.95));
+      }
+
+      // Hi-hats: glints in the middle rows; noisier sounds glint more.
+      if (on('hats')) {
+        state.glints ??= [] as Array<{ r: number; c: number; at: number; s: number }>;
+        if (music.hits.hat) {
+          const n = 1 + Math.round(music.timbre.flatness * 3);
+          for (let i = 0; i < n; i++) state.glints.push({ r: 2 + Math.floor(Math.random() * Math.max(1, rows - 4)), c: Math.floor(Math.random() * cols), at: t, s: 0.5 + 0.5 * music.hits.hat });
+        }
+        state.glints = state.glints.filter((g: any) => t - g.at < 0.3);
+        for (const g of state.glints) put(g.r, g.c, g.s * Math.exp(-(t - g.at) / 0.08), 0.95);
+      }
+
+      // Melody: a point at the note's height, on the side the mids are panned to, leaving a short trail.
+      if (on('melody')) {
+        state.trail ??= [] as Array<{ r: number; c: number; at: number }>;
+        const p = music.pitch;
+        if (p && p.confidence > 0.5) {
+          const r = Math.round((1 - clamp01((p.midi - 48) / 36)) * (rows - 1));
+          const c = Math.round(((music.stereo.pan[1] + 1) / 2) * (cols - 1));
+          const last = state.trail[state.trail.length - 1];
+          if (!last || last.r !== r || last.c !== c || t - last.at > 0.12) state.trail.push({ r, c, at: t });
+        }
+        state.trail = state.trail.filter((x: any) => t - x.at < 1);
+        for (const x of state.trail) put(x.r, x.c, Math.exp(-(t - x.at) / 0.3), 0.72);
+      }
+
+      // Drops: loudness jumps well above the last few seconds → blinder.
+      if (on('drops')) {
+        state.eHist ??= [] as number[];
+        state.eAt ??= t;
+        if (t - state.eAt >= 0.25) {
+          state.eHist.push(music.energy);
+          if (state.eHist.length > 16) state.eHist.shift();
+          state.eAt = t;
+        }
+        const h: number[] = state.eHist;
+        const before = h.length >= 12 ? h.slice(0, 8).reduce((a, b) => a + b, 0) / 8 : 1;
+        if (music.energy - before > 0.28 && music.hits.kick && t - (state.lastDrop ?? -99) > 12) state.lastDrop = t;
+        const bl = state.lastDrop !== undefined ? Math.exp(-(t - state.lastDrop) / 0.35) : 0;
+        if (bl > 0.02) for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) put(r, c, bl, 0.6 + 0.4 * bl);
+      }
+      return { v, w };
+    },
+  },
+  {
     id: 'blinder',
     name: 'Blinder',
     category: 'music',

@@ -64,6 +64,7 @@ const LOOKS: Record<'calm' | 'groove' | 'peak', Look[]> = {
     { pattern: 'pulse', palette: 'warm' },
   ],
   groove: [
+    { pattern: 'mix', palette: 'dual' },
     { pattern: 'kick-snare', palette: 'dual' },
     { pattern: 'scanner', palette: 'dual' },
     { pattern: 'quadrants', palette: 'dual' },
@@ -73,6 +74,7 @@ const LOOKS: Record<'calm' | 'groove' | 'peak', Look[]> = {
     { pattern: 'scanner', palette: 'dual', params: { axis: 'rows' } },
   ],
   peak: [
+    { pattern: 'mix', palette: 'dual' },
     { pattern: 'burst', palette: 'dual' },
     { pattern: 'mirror-spectrum', palette: 'dual' },
     { pattern: 'beat-sparkle', palette: 'cool' },

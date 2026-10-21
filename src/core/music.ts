@@ -49,6 +49,49 @@ export interface Music {
   progress: number;
   /** Song section at this moment (shows): intro, verse, build, drop, breakdown, outro. */
   section?: string;
+  /** Where things are between the speakers. */
+  stereo: Stereo;
+  /** The colour of the sound. */
+  timbre: Timbre;
+  /** The most prominent melody note, when there is a clear one. */
+  pitch: Pitch | null;
+  /** Energy in each of the 12 note names (C … B), 0..1. */
+  chroma: number[];
+}
+
+export interface Stereo {
+  /** −1 all left … +1 all right. */
+  balance: number;
+  /** 0 = mono … 1 = very wide. */
+  width: number;
+  /** Position of the low (bass), mid (melody, vocals) and high (hats, air) parts, −1 … +1. */
+  pan: [number, number, number];
+}
+
+export interface Timbre {
+  /** Spectral centroid on a 0..1 scale (≈150 Hz dull … ≈8 kHz bright). */
+  centroid: number;
+  /** 0 = clear tones … 1 = noise-like. */
+  flatness: number;
+  /** How fast the spectrum is changing right now, 0..1. */
+  flux: number;
+}
+
+export interface Pitch {
+  /** MIDI note number (60 = middle C), may be fractional. */
+  midi: number;
+  confidence: number;
+}
+
+export const NEUTRAL_STEREO: Stereo = { balance: 0, width: 0.3, pan: [0, 0, 0] };
+export const NEUTRAL_TIMBRE: Timbre = { centroid: 0.45, flatness: 0.1, flux: 0 };
+const NO_CHROMA = () => new Array(12).fill(0);
+
+/** Centroid estimate from six band levels (shows have bands, not a full spectrum). */
+function centroidFromBands(bands: number[]) {
+  let sw = 0, s = 0;
+  bands.forEach((v, i) => ((sw += v * i), (s += v)));
+  return s > 0 ? Math.max(0, Math.min(1, sw / s / 5)) : 0.45;
 }
 
 export type Sample = Omit<Music, 't' | 'progress'> & {
@@ -129,6 +172,11 @@ export class Metronome implements MusicSource {
     const h1 = (D - this.grid.anchorMs) / (this.grid.periodMs / 2);
     if (Math.floor(h1) > Math.floor(h0) && Math.floor(h1) % 2 === 1) addHit(hits, 'hat', 0.5, this.grid.anchorMs + Math.floor(h1) * (this.grid.periodMs / 2));
     const pulse = Math.exp(-pos.phase * 4);
+    // A little A-minor arpeggio that wanders between the speakers, so melody/stereo looks can be previewed.
+    const midi = [57, 60, 64, 67][Math.floor(pos.beat) % 4] + 12 * (pos.bar % 2);
+    const chroma = NO_CHROMA();
+    chroma[midi % 12] = 1;
+    const sweep = Math.sin((pos.beat * Math.PI) / 4);
     return {
       ...pos,
       locked: false,
@@ -136,6 +184,10 @@ export class Metronome implements MusicSource {
       energy: 0.65,
       level: 0.45 + 0.4 * pulse,
       bands: [0.9 * pulse + 0.1, 0.7 * pulse + 0.15, 0.45, 0.4, 0.35 + 0.3 * (hits.hat ? 1 : 0), 0.3],
+      stereo: { balance: sweep * 0.2, width: 0.6, pan: [0, sweep * 0.8, -sweep * 0.5] as [number, number, number] },
+      timbre: { centroid: 0.45 + 0.25 * (hits.hat ? 1 : 0), flatness: 0.15 + 0.3 * (hits.hat ? 1 : 0), flux: pulse * 0.6 },
+      pitch: { midi, confidence: 0.9 },
+      chroma,
     };
   }
 }
@@ -154,6 +206,7 @@ export class LiveClock implements MusicSource {
   private pending: Hit[] = [];
   private level = 0;
   private bands = [0, 0, 0, 0, 0, 0];
+  private extra: { stereo: Stereo; timbre: Timbre; pitch: Pitch | null; chroma: number[] } = { stereo: NEUTRAL_STEREO, timbre: NEUTRAL_TIMBRE, pitch: null, chroma: NO_CHROMA() };
   private featuresAt = 0;
   private energy = 0;
   private lastSampleD = 0;
@@ -175,9 +228,10 @@ export class LiveClock implements MusicSource {
     if (this.pending.length > 200) this.pending.splice(0, this.pending.length - 200);
   }
 
-  setFeatures(level: number, bands: number[]) {
+  setFeatures(level: number, bands: number[], extra: Partial<LiveClock['extra']> = {}) {
     this.level = level;
     this.bands = bands;
+    this.extra = { ...this.extra, ...extra };
     this.featuresAt = Date.now();
   }
 
@@ -198,7 +252,10 @@ export class LiveClock implements MusicSource {
     this.energy += (level - this.energy) * Math.min(1, dt / 1.5);
 
     if (this.grid && this.isLocked) gridHits(this.grid, prevD, D, hits, 0.6 + 0.4 * this.energy);
-    const base = { ...finish(hits), energy: this.energy, level, bands: fresh ? this.bands : [0, 0, 0, 0, 0, 0] };
+    const base = {
+      ...finish(hits), energy: this.energy, level, bands: fresh ? this.bands : [0, 0, 0, 0, 0, 0],
+      ...(fresh ? this.extra : { stereo: NEUTRAL_STEREO, timbre: NEUTRAL_TIMBRE, pitch: null, chroma: NO_CHROMA() }),
+    };
     if (this.grid && this.isLocked) return { ...gridPosition(this.grid, D), locked: true, ...base };
     // Not locked: keep motion going on a free-running clock, but only react to real hits.
     const pos = this.fallback.sample(prevD, D);
@@ -322,9 +379,15 @@ export class ShowClock implements MusicSource {
     let energy = 0;
     for (let k = -10; k <= 10; k++) energy += this.envAt(s1 + k * 0.1);
     energy /= 21;
+    const bands = this.bandsAt(s1);
     return {
       beat, bar: Math.max(0, bar), beatInBar, phase: beat - Math.floor(beat), bpm, locked: true, ...finish(hits),
-      energy, level: this.envAt(s1), bands: this.bandsAt(s1), section: sectionAt,
+      energy, level: this.envAt(s1), bands, section: sectionAt,
+      // Shows store band envelopes, not stereo or pitch: estimate brightness, keep the rest neutral.
+      stereo: NEUTRAL_STEREO,
+      timbre: { centroid: centroidFromBands(bands), flatness: Math.min(1, (bands[4] + bands[5]) / 2), flux: 0 },
+      pitch: null,
+      chroma: NO_CHROMA(),
     };
   }
 }

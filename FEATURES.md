@@ -96,6 +96,17 @@ Measured on an office network with 28 WiZ bulbs: most had 0% loss, but bulbs at 
 | ☐ | Show playback on the server | `ShowClock` + `/api/show/*` | The browser only reports where the song is (and its speaker delay); timing is exact and independent of the tab. Shows (cues + song map) saved in `shows/` ([format](shows/README.md)). |
 | ☐ | Preview first | **Send to real bulbs** off by default | Everything plays on the on-screen grid first. |
 
+### Sound Lab and the Full mix
+
+| ✔ | Feature | Where | The non-obvious part |
+|---|---|---|---|
+| ☐ | **Sound Lab tab** | dashboard → Sound Lab | Live panels for loudness, spectrogram, bands, rhythm (kick/snare/hat lamps, tempo, bar), timbre, melody + chroma, stereo (vectorscope, balance, width, low/mid/high position), from microphone, system sound or a song file, next to the wall preview. Each panel links to the matching section of `docs/seeing-sound.html`. |
+| ☐ | Stereo in the live engine | `web/audio.js` `colourAndSpace()` | Left/right analysers; balance, width (from correlation), and *where low, mid and high sit*. A mono microphone is detected and reported as centred instead of as nonsense stereo. Test: melody hard left/right measured at −0.95/+0.95, bass at 0.00. |
+| ☐ | Timbre and melody | same | Centroid (brightness), flatness (noisiness), flux (change); melody = strongest *peaked* note E3–E6 whose fundamental is present, on a whitened spectrum so bass/kick can't win. Test: 100 % correct notes. |
+| ☐ | Drum hits that don't confuse each other | `measure()` | Hi-hat vs snare decided by where the new energy is (hats dense above 7 kHz); kick "splash" in the snare range rejected (≈1e-6 of the kick's rise vs ≈1e-3 for a real snare); tonal (melody) onsets rejected by band flatness; 0.6 s warm-up. Test song: kicks 38/38, snares 18/19 with 0 false, hats 34/39. |
+| ☐ | **Full mix** layer compositor | `core/patterns.ts` `mix` | Background wash (energy → brightness, centroid → warm/cool, stereo width → spread), bass column, kick floor, snare ceiling, hi-hat glints (more when noisy), melody point (pitch = height, mid-band pan = column) with a trail, blinder on drops. Every layer can be switched off to study one part alone. Used by the Autopilot. |
+| ☐ | Regression tests | `npm test` | Numbering, all patterns, Full mix layers, sync timing (±5 ms), live beat prediction, autopilot arc, and a guard that tests never touch the real layout. |
+
 ## 7. Architecture choices worth comparing
 
 - **Generic device model** (`core/types.ts`): every device has a `kind` and a list of `capabilities`. The UI only shows controls a device supports, and the hub refuses commands it can't do. Adding a brand means adding one driver file; adding locks or sensors means adding capabilities.

@@ -213,6 +213,13 @@ export function startServer(opts: { port: number; open: boolean; hub?: Hub }) {
     const method = req.method ?? 'GET';
 
     try {
+      // The Seeing Sound lab page from the repo's docs/ (the Sound Lab tab links to it).
+      if (method === 'GET' && url.pathname === '/docs/seeing-sound.html') {
+        const file = path.resolve(__dirname, '..', '..', 'docs', 'seeing-sound.html');
+        if (!fs.existsSync(file)) return json(res, 404, { error: 'Not found' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(fs.readFileSync(file));
+      }
       if (method === 'GET' && url.pathname === '/audio.js') {
         res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(fs.readFileSync(path.join(__dirname, 'audio.js')));
@@ -411,7 +418,19 @@ export function startServer(opts: { port: number; open: boolean; hub?: Hub }) {
       // tempo grid when locked and drum hits (kick/snare/hat) as they're heard.
       if (resource === 'audio' && method === 'POST') {
         const body = await readBody(req);
-        if (Array.isArray(body.bands)) live.setFeatures(Math.max(0, Math.min(1, Number(body.level) || 0)), body.bands.slice(0, 6).map((v: unknown) => Math.max(0, Math.min(1, Number(v) || 0))));
+        if (Array.isArray(body.bands)) {
+          const u = (x: unknown, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, Number(x) || 0));
+          const extra: Parameters<LiveClock['setFeatures']>[2] = {};
+          if (body.stereo && typeof body.stereo === 'object') {
+            const pan = Array.isArray(body.stereo.pan) ? body.stereo.pan : [];
+            extra.stereo = { balance: u(body.stereo.balance, -1, 1), width: u(body.stereo.width), pan: [u(pan[0], -1, 1), u(pan[1], -1, 1), u(pan[2], -1, 1)] };
+          }
+          if (body.timbre && typeof body.timbre === 'object') extra.timbre = { centroid: u(body.timbre.centroid), flatness: u(body.timbre.flatness), flux: u(body.timbre.flux) };
+          if (body.pitch === null) extra.pitch = null;
+          else if (body.pitch && typeof body.pitch === 'object') extra.pitch = { midi: u(body.pitch.midi, 0, 127), confidence: u(body.pitch.confidence) };
+          if (Array.isArray(body.chroma) && body.chroma.length === 12) extra.chroma = body.chroma.map((x: unknown) => u(x));
+          live.setFeatures(u(body.level), body.bands.slice(0, 6).map((v: unknown) => u(v)), extra);
+        }
         if (body.grid !== undefined) live.setGrid(body.grid);
         if (Array.isArray(body.hits)) live.push(body.hits.filter((h: any) => ['beat', 'downbeat', 'kick', 'snare', 'hat'].includes(h?.type)).map((h: any) => ({ at: Number(h.at), type: h.type, strength: Number(h.strength) || 0.7 })));
         res.writeHead(204).end();
